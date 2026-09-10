@@ -39,6 +39,11 @@ from .worker_yayinlama_araclari import (
     worker_video_yayinla,
     worker_instagram_carousel_yayinla,
 )
+from .app_asset_araclari import (
+    app_baglanti_durumu,
+    app_asset_listele,
+    app_asset_detay,
+)
 
 
 def _missing_tool(tool_name: str, error: Exception):
@@ -430,6 +435,19 @@ CONTENT_CREATOR_ARACLARI = [
     workspace_listele,
 ]
 
+ASSET_COLLECTOR_ARACLARI = [
+    app_baglanti_durumu,
+    app_asset_listele,
+    app_asset_detay,
+    context_paketi_oku,
+    context_aksiyon_kaydet,
+    workspace_oku,
+    workspace_sonunu_oku,
+    workspace_yaz,
+    workspace_ekle,
+    workspace_listele,
+]
+
 GENERIC_BROWSER_TOOLS_ACTIVE = True
 
 BROWSER_ARACLARI = [] if not GENERIC_BROWSER_TOOLS_ACTIVE else [
@@ -475,6 +493,7 @@ _AGENT_TOOL_MAP = {
     "base": BASE_ARACLAR,
     "sosyal_medya_agent": SOSYAL_MEDYA_ARACLARI,
     "content_creator_agent": CONTENT_CREATOR_ARACLARI,
+    "asset_collector_agent": ASSET_COLLECTOR_ARACLARI,
     "sistem_agent": SISTEM_ARACLARI,
     "arastirma_agent": ARAMA_ARACLARI,
     "kod_agent": KOD_ARACLARI,

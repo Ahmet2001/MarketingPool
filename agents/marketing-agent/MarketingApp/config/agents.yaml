@@ -81,6 +81,15 @@ agents:
   tool_mode: default
   system_prompt: ''
   tools: []
+- name: asset_collector_agent
+  type: builtin
+  enabled: true
+  description: App'in onayladigi medya varliklarini (video, gorsel, ses, dokuman)
+    listeleme ve detaylandirma ajani.
+  model: gemma-4-26b-a4b-it
+  tool_mode: default
+  system_prompt: ''
+  tools: []
 - name: computer
   type: builtin
   enabled: false

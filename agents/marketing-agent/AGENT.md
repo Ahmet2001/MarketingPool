@@ -47,6 +47,33 @@ at an HTTPS URL. This agent does not upload local files anywhere — per the
 responsibility map, media storage belongs to the App layer, which does not
 exist in this repository yet.
 
+## Asset collection (new)
+
+The `future_work.md` "Planned worker environment interface" item #1
+(`collect_assets`) now has a first concrete implementation on the agent
+side: a new `asset_collector_agent` sub-agent with three tools
+(`app_baglanti_durumu`, `app_asset_listele`, `app_asset_detay`, in
+[`MarketingApp/araclar/app_asset_araclari.py`](./MarketingApp/araclar/app_asset_araclari.py))
+that read approved media assets — matching
+[`schemas/asset.schema.json`](../../schemas/asset.schema.json) — from the
+App over plain HTTP (`GET {APP_INTERNAL_URL}/api/assets` and
+`GET {APP_INTERNAL_URL}/api/assets/{id}`, bearer-token auth).
+
+**Honest scope:** the App does not expose this endpoint yet (same "roadmap,
+not a live HTTP surface" caveat as the worker section above). Until
+`APP_INTERNAL_URL` is set, every call returns a clear configuration error
+instead of silently failing or fabricating data. Once the App implements
+the two-endpoint contract described in `app_asset_araclari.py`'s module
+docstring, setting `APP_INTERNAL_URL` (and `APP_INTERNAL_TOKEN` if the App
+requires it) is enough to make it work — no code changes needed.
+
+These tools are read-only by design: no credentials, upload, or approval-state
+mutation ever happens through them, per the responsibility map's "does not
+own: direct secret access" rule for this agent. A successful listing is also
+cached to `workspace/assets/app_asset_catalog.json` so `content_creator_agent`
+and `sosyal_medya_agent` can reference the same asset URLs without re-querying
+the App.
+
 ## What deliberately stays out of the worker
 
 Everything the worker has no contract for — liking, following, commenting,

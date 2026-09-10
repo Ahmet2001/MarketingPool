@@ -32,6 +32,7 @@ Mimar is a Python agent platform built around a single orchestrator LLM (`BaseMo
 
 ## Features
 
+- **Asset Collector Agent** — lists and fetches App-approved media assets (video/image/audio/document, schema-validated) over HTTP for the other agents to reuse (see [`AGENT.md`](./AGENT.md)).
 - **Content Creator Agent** — text, image, and video content generation (HTML/CSS → PNG posts, stock footage → MP4 reels, website-to-post extraction).
 - **Social Media Agent** — X (Twitter), Instagram, and YouTube automation: posting, replies, likes, follows, notification scanning, market snapshots. Can also queue Instagram/YouTube/TikTok video and carousel publishes onto `social-media-worker`'s job queue (see [`AGENT.md`](./AGENT.md)).
 - **Browser Agent** — Selenium-based navigation, DOM reading, and form interaction.

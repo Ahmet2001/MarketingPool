@@ -62,6 +62,11 @@ SUBMODEL_ROUTING_RULES = {
         "Genel web gezinme, DOM okuma, form doldurma ve Selenium tabanli tarayici "
         "isleri icin bu alt ajani kullan."
     ),
+    "asset_collector_agent": (
+        "App'in onayladigi medya varliklarini (video/gorsel/ses/dokuman) listeleme "
+        "veya tek bir varligin detayini getirme gorevlerini bu alt ajana devret; "
+        "icerik/yayinlama once bu varliklarin URL'lerine ihtiyac duyabilir."
+    ),
 }
 
 
