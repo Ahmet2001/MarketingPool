@@ -1,0 +1,6 @@
+agent: all
+description: Instagram uzerinde profil inceleme, yorum, takip ve etkileşim akislarina dair operasyon rehberi verir
+enabled: true
+function: instagram_kullanim_rehberi
+module: MarketingApp.araclar.skills.instagram_kullanim_rehberi
+name: instagram_kullanim_rehberi
