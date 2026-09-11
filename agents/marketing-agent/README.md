@@ -25,6 +25,7 @@ Mimar is a Python agent platform built around a single orchestrator LLM (`BaseMo
 - [Configuration](#configuration)
 - [Terminal Commands](#terminal-commands)
 - [Using Mimar as an Embedded Agent](#using-mimar-as-an-embedded-agent)
+- [Running as a Worker](#running-as-a-worker)
 - [Project Structure](#project-structure)
 - [Requirements](#requirements)
 - [Contributing](#contributing)
@@ -143,19 +144,38 @@ print(result.text)
 
 `MimarAgent` never starts the heartbeat/Telegram/Discord background tasks. Workspace and config directories can be redirected per instance via `workspace_dir`/`config_dir` (see the module docstring for the single-process-per-workspace caveat).
 
+## Running as a Worker
+
+```bash
+./worker.sh
+# or, with the venv already active:
+python -m MarketingApp.worker
+```
+
+`python -m MarketingApp.worker` runs Mimar unattended, with two entry points sharing one `MimarAgent` instance:
+
+- A **queue poller** that claims `status='queued'` rows from an `agent_jobs` Supabase table (schema: [`migrations/001_agent_jobs.sql`](./migrations/001_agent_jobs.sql)) and runs each one through `MimarAgent.run()`.
+- An **MCP server** (Streamable HTTP, `POST /mcp`, bearer-token auth) exposing `run_marketing_task(task, context)` / `check_marketing_task(job_id)` for on-demand calls from any MCP client.
+
+See [`AGENT.md`](./AGENT.md#running-the-agent-as-a-worker-new) for the full picture, including the single-process-per-workspace limitation this shares with `MimarAgent`.
+
 ## Project Structure
 
 ```
 MarketingApp/
 ├── agent_api.py         # Embeddable agent wrapper (MimarAgent)
+├── worker.py              # Unattended entry point: agent_jobs queue poller + MCP server
 ├── paths.py              # Central, overridable workspace/config path resolution
 ├── main.py               # Entry point (python -m MarketingApp.main)
 ├── araclar/               # Tools: browser, search, memory, content creation, workspace, skills
 ├── config/                # agents.yaml, custom_tools.yaml, agent_packs.yaml, heartbeat_config.yaml
-├── environments/          # terminal.py, heartbeat.py, telegram.py, discord_bot.py, automation_runtime.py
+├── environments/          # terminal.py, heartbeat.py, telegram.py, discord_bot.py, automation_runtime.py,
+│                          # agent_job_queue.py, agent_mcp_server.py
 ├── llms/                  # BaseModel orchestrator, Agent Studio, SubModels/
 ├── legacy/panel/          # Archived FastAPI web panel (superseded by the terminal interface)
 └── workspace/              # Runtime data: memory, drafts, assets, custom tools, agent packs
+
+migrations/                 # agent_jobs table + claim_next_agent_job() (worker.py's queue)
 ```
 
 ## Requirements

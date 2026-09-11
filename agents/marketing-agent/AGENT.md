@@ -74,6 +74,45 @@ cached to `workspace/assets/app_asset_catalog.json` so `content_creator_agent`
 and `sosyal_medya_agent` can reference the same asset URLs without re-querying
 the App.
 
+## Running the agent as a worker (new)
+
+Besides the interactive terminal (`main.py`), this agent can now run
+unattended as a worker: `python -m MarketingApp.worker` (or `./worker.sh`)
+starts one process with **two** entry points sharing a single `MimarAgent`
+instance, serialized through the existing `AutomationCoordinator` so they
+never touch `BaseModel`/the browser session concurrently:
+
+1. **Queue poller** — polls the new `agent_jobs` Supabase table (schema in
+   [`migrations/001_agent_jobs.sql`](./migrations/001_agent_jobs.sql), same
+   Supabase project as `publish_jobs`) for `status='queued'` rows, claims one
+   at a time (`claim_next_agent_job()`, same skip-locked pattern as
+   `social-media-worker`'s `claim_publish_job()`), runs
+   `payload.task`/`payload.context` through `MimarAgent.run()`, and writes
+   `results`/`error`/`status` back. Anything — the App, a cron job, a human
+   via `psql`/Studio — queues work just by inserting a row; nothing needs to
+   import Python to use it.
+2. **MCP server** (Streamable HTTP, `POST /mcp`) — same protocol and
+   bearer-token pattern as [`mcp_worker`](../../mcp_worker): any MCP client
+   can call `run_marketing_task(task, context)` on demand. Because a task can
+   run long (`browser_agent`'s tool calls have no timeout), it blocks up to
+   `AGENT_WORKER_WAIT_MS` and then returns `{status:"running", jobId}` instead
+   of hanging, mirroring `mcp_worker`'s `generate_lesson_video` /
+   `check_lesson_status` pattern — poll with `check_marketing_task(job_id)`.
+   Without `AGENT_WORKER_MCP_TOKEN` set, the server answers every request
+   with 500 rather than running open (same rule as `mcp_worker/server.js`).
+
+Both entry points write to the same `agent_jobs` table when Supabase is
+configured, so it doubles as an audit trail regardless of which one handled
+a given task; the MCP path still works standalone (no Supabase) if you only
+want on-demand calls.
+
+**Known limitation:** the two entry points coordinate with each other only
+*inside this one process*. Running `worker.py` and `main.py` against the
+same `workspace_dir` at the same time is unsupported — that's the same
+single-process/single-workspace constraint [`agent_api.py`](./MarketingApp/agent_api.py)
+already documents for `MimarAgent`, just restated here because `worker.py`
+is a second thing that constructs one. Pick one per workspace.
+
 ## What deliberately stays out of the worker
 
 Everything the worker has no contract for — liking, following, commenting,
