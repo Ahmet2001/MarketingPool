@@ -38,6 +38,7 @@ from .content_creator_araclari import (
 from .worker_yayinlama_araclari import (
     worker_video_yayinla,
     worker_instagram_carousel_yayinla,
+    worker_yayin_durumu_sorgula,
 )
 from .app_asset_araclari import (
     app_baglanti_durumu,
@@ -333,6 +334,7 @@ SOSYAL_MEDYA_ARACLARI = [
     # --- Worker uzerinden video/carousel yayinlama (social-media-worker) ---
     worker_video_yayinla,
     worker_instagram_carousel_yayinla,
+    worker_yayin_durumu_sorgula,
     # --- Workspace (strateji/log dosyalari icin) ---
     context_paketi_oku,
     context_aksiyon_kaydet,

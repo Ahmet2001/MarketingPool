@@ -56,6 +56,7 @@ agents:
   - update_queue_item
   - worker_video_yayinla
   - worker_instagram_carousel_yayinla
+  - worker_yayin_durumu_sorgula
   - workspace_ekle
   - workspace_listele
   - workspace_oku

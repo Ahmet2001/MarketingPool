@@ -14,6 +14,8 @@ audit-trail insert'ini yapar; asil is (`MimarAgent.run`) burada degil
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 from datetime import datetime, timezone
 from typing import Any
@@ -21,6 +23,7 @@ from typing import Any
 import requests
 
 _TIMEOUT_SECONDS = 20
+_warned_broad_key = False
 
 
 def _now_iso() -> str:
@@ -33,18 +36,43 @@ class AgentJobQueueError(RuntimeError):
 
 def is_configured() -> bool:
     return bool((os.getenv("SUPABASE_URL") or "").strip()) and bool(
-        (os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+        (os.getenv("SUPABASE_AGENT_KEY") or os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
     )
 
 
 def _config() -> tuple[str, str]:
+    """(base_url, key) dondurur. `SUPABASE_AGENT_KEY` (daraltilmis role/anahtar
+    — bkz. migrations/002'deki ornek GRANT/POLICY) varsa o tercih edilir;
+    yoksa tam service-role yetkili `SUPABASE_SECRET_KEY`'e dusulur ve BU
+    process icin bir kez uyari loglanir."""
+    global _warned_broad_key
+
     url = (os.getenv("SUPABASE_URL") or "").strip().rstrip("/")
-    key = (os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
-    if not url or not key:
+    scoped_key = (os.getenv("SUPABASE_AGENT_KEY") or "").strip()
+    broad_key = (os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+
+    if not url or not (scoped_key or broad_key):
         raise AgentJobQueueError(
-            "SUPABASE_URL / SUPABASE_SECRET_KEY tanimli degil; agent_jobs kuyrugu kullanilamaz."
+            "SUPABASE_URL / (SUPABASE_AGENT_KEY veya SUPABASE_SECRET_KEY) tanimli degil; "
+            "agent_jobs kuyrugu kullanilamaz."
         )
-    return url, key
+
+    if scoped_key:
+        return url, scoped_key
+
+    if not _warned_broad_key:
+        print(
+            "⚠️ [Agent Job Queue] SUPABASE_AGENT_KEY tanimli degil; daraltilmamis "
+            "SUPABASE_SECRET_KEY kullaniliyor (tum projeye erisimi var). Bkz. "
+            "AGENT.md 'Supabase anahtarini daraltma'."
+        )
+        _warned_broad_key = True
+    return url, broad_key
+
+
+def _idempotency_key(payload: dict[str, Any]) -> str:
+    normalized = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:48]
 
 
 def _headers(key: str, *, prefer: str | None = None) -> dict[str, str]:
@@ -78,15 +106,49 @@ def claim_next_agent_job() -> dict[str, Any] | None:
     return data
 
 
-def insert_agent_job(payload: dict[str, Any], *, owner_ref: str = "", status: str = "queued") -> dict[str, Any]:
-    """Yeni bir agent_jobs satiri ekler; eklenen satiri dondurur.
+def _lookup_job_by_idempotency_key(base_url: str, key_value: str, headers: dict[str, str]) -> dict[str, Any] | None:
+    try:
+        response = requests.get(
+            f"{base_url}/rest/v1/agent_jobs",
+            headers=headers,
+            params={"idempotency_key": f"eq.{key_value}", "select": "*", "limit": "1"},
+            timeout=_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        rows = response.json()
+        return rows[0] if isinstance(rows, list) and rows else None
+    except Exception:
+        return None
+
+
+def insert_agent_job(
+    payload: dict[str, Any],
+    *,
+    owner_ref: str = "",
+    status: str = "queued",
+    idempotency_key: str | None = None,
+) -> dict[str, Any]:
+    """Yeni bir agent_jobs satiri ekler; eklenen (veya idempotency_key
+    eslesirse VAR OLAN) satiri dondurur.
 
     status='processing' MCP on-demand cagrilarinin kendi isini hemen kendisi
     calistirip audit-trail birakmasi icindir (claim RPC'sini atlamak gerekir,
     cunku is zaten bu process tarafindan sahipli).
+
+    Varsayilan olarak `payload` icerigine dayali deterministik bir anahtar
+    uretilir: ayni payload'la iki kez cagrilirsa (network retry, cagiran
+    tarafin ayni istegi tekrar denemesi) ikinci deneme yeni bir satir
+    olusturmaz, ilk satiri dondurur (bkz.
+    migrations/002_agent_jobs_idempotency_key.sql). Cagiran taraf "bu her
+    zaman YENI bir kayit olmali, ayni gorev metniyle bile" istiyorsa (orn.
+    worker.py'nin MCP audit-trail insert'i — orada zaten retry yok, her
+    cagri ayri bir olay) `idempotency_key` parametresiyle kendi benzersiz
+    degerini verebilir.
     """
     base_url, key = _config()
-    body: dict[str, Any] = {"payload": payload, "status": status}
+    key_value = idempotency_key or _idempotency_key(payload)
+    headers = _headers(key, prefer="return=representation")
+    body: dict[str, Any] = {"payload": payload, "status": status, "idempotency_key": key_value}
     if owner_ref:
         body["owner_ref"] = owner_ref
     if status == "processing":
@@ -95,11 +157,17 @@ def insert_agent_job(payload: dict[str, Any], *, owner_ref: str = "", status: st
     try:
         response = requests.post(
             f"{base_url}/rest/v1/agent_jobs",
-            headers=_headers(key, prefer="return=representation"),
+            headers=headers,
             json=body,
             timeout=_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
+    except requests.HTTPError as exc:
+        if exc.response is not None and exc.response.status_code == 409:
+            existing = _lookup_job_by_idempotency_key(base_url, key_value, _headers(key))
+            if existing:
+                return existing
+        raise AgentJobQueueError(f"agent_jobs kaydi eklenemedi: {exc}") from exc
     except requests.RequestException as exc:
         raise AgentJobQueueError(f"agent_jobs kaydi eklenemedi: {exc}") from exc
 

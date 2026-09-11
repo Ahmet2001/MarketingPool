@@ -1,6 +1,6 @@
 """
 Worker Yayinlama Araclari — social-media-worker'in `publish_jobs` kuyruguna
-sema-uyumlu bir is (job) ekler.
+sema-uyumlu bir is (job) ekler ve durumunu geri okur.
 
 Bu modul, bu ajanin (marketing-agent) `../../schemas/publish_request.schema.json`
 sozlesmesine uydugu TEK gercek entegrasyon noktasidir: worker su an sadece
@@ -18,33 +18,106 @@ Onemli sinirlar:
     yorum, tweet atma gibi islemler worker'da karsiligi olmadigi icin
     Mimar'in kendi browser tabanli sosyal medya araclarinda (supervised
     local) kalmaya devam eder.
+  - Gercek bir yayin (`worker_video_yayinla`/`worker_instagram_carousel_yayinla`)
+    kuyruga girmeden once `environments.approval_runtime.request_tool_approval`
+    ile onay ister — future_work.md'nin "Present external-write actions for
+    approval when required" kuralinin agent-tarafi karsiligi. Onaylanmazsa
+    (ya da onaylayacak kimse yoksa — bkz. approval_runtime) is HIC
+    kuyruga girmez.
+  - Ayni istegin iki kez kuyruga girmesini (network retry, LLM'in "sonucu
+    goremedim tekrar deneyeyim" refleksi) onlemek icin payload icerigine
+    dayali bir `idempotency_key` gonderilir (bkz.
+    ../../social-media-worker/migrations/002_publish_jobs_idempotency_key.sql).
+    Ayni anahtarla ikinci insert denemesi, VAR OLAN isin durumunu dondurur;
+    yeni bir is olusturmaz.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 
 import requests
+
+from MarketingApp.environments.approval_runtime import request_tool_approval
 
 _ALLOWED_VIDEO_PLATFORMS = {"instagram", "youtube", "tiktok"}
 _SUPABASE_TIMEOUT_SECONDS = 15
 
 
 def _supabase_config() -> tuple[str, str] | str:
-    """(base_url, key) dondurur; eksikse kullanici-okur bir hata metni dondurur."""
+    """(base_url, key) dondurur; eksikse kullanici-okur bir hata metni dondurur.
+
+    `SUPABASE_AGENT_KEY` (publish_jobs uzerinde sadece insert/select yapabilen,
+    daraltilmis bir role/anahtar — bkz. migrations/002'deki ornek GRANT/POLICY)
+    varsa o tercih edilir. Yoksa `SUPABASE_SECRET_KEY` (tam service-role
+    yetkisi) kullanilir; bu durumda tek seferlik bir uyari loglanir, cunku bu
+    anahtar sadece bu tabloya degil, projedeki her tabloya erisebilir.
+    """
     url = (os.getenv("SUPABASE_URL") or "").strip().rstrip("/")
-    key = (os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
-    if not url or not key:
+    scoped_key = (os.getenv("SUPABASE_AGENT_KEY") or "").strip()
+    broad_key = (os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+
+    if not url or not (scoped_key or broad_key):
         return (
-            "❌ Hata: SUPABASE_URL ve SUPABASE_SECRET_KEY tanimli degil. "
+            "❌ Hata: SUPABASE_URL ve (SUPABASE_AGENT_KEY veya SUPABASE_SECRET_KEY) tanimli degil. "
             "social-media-worker'in kullandigi ayni Supabase projesine ait "
             "degerleri .env dosyasina ekleyin."
         )
-    return url, key
+
+    if scoped_key:
+        return url, scoped_key
+
+    print(
+        "⚠️ [Worker Yayinlama] SUPABASE_AGENT_KEY tanimli degil; daraltilmamis "
+        "SUPABASE_SECRET_KEY kullaniliyor (tum projeye erisimi var). Daha az "
+        "yetkili bir anahtar icin AGENT.md'deki 'Supabase anahtarini daraltma' "
+        "bolumune bakin."
+    )
+    return url, broad_key
 
 
 def _is_https_url(value: str) -> bool:
     return bool(value) and value.strip().lower().startswith("https://")
+
+
+def _idempotency_key(payload: dict) -> str:
+    """Payload icerigine dayali, deterministik bir anahtar uretir.
+
+    Ayni action + ayni alanlarla iki kez cagrilirsa AYNI anahtar cikar ->
+    ikinci insert denemesi (retry) yeni bir is degil, var olan isi dondurur.
+    """
+    normalized = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:48]
+
+
+def _lookup_job_by_idempotency_key(base_url: str, key: str, headers: dict) -> dict | None:
+    try:
+        response = requests.get(
+            f"{base_url}/rest/v1/publish_jobs",
+            headers=headers,
+            params={"idempotency_key": f"eq.{key}", "select": "*", "limit": "1"},
+            timeout=_SUPABASE_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        rows = response.json()
+        return rows[0] if isinstance(rows, list) and rows else None
+    except Exception:
+        return None
+
+
+def _format_job_status(job: dict) -> str:
+    job_id = job.get("id", "bilinmiyor")
+    status = job.get("status", "bilinmiyor")
+    results = job.get("results") or {}
+    error = job.get("error")
+    lines = [f"job_id={job_id} status={status}"]
+    if results:
+        lines.append(f"results={json.dumps(results, ensure_ascii=False)}")
+    if error:
+        lines.append(f"error={error}")
+    return " | ".join(lines)
 
 
 def _insert_publish_job(payload: dict, owner_ref: str = "") -> str:
@@ -53,19 +126,22 @@ def _insert_publish_job(payload: dict, owner_ref: str = "") -> str:
         return config
 
     base_url, key = config
-    body = {"payload": payload}
+    headers = {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+    }
+
+    key_value = _idempotency_key(payload)
+    body = {"payload": payload, "idempotency_key": key_value}
     if owner_ref:
         body["owner_ref"] = owner_ref
 
     try:
         response = requests.post(
             f"{base_url}/rest/v1/publish_jobs",
-            headers={
-                "apikey": key,
-                "Authorization": f"Bearer {key}",
-                "Content-Type": "application/json",
-                "Prefer": "return=representation",
-            },
+            headers=headers,
             json=body,
             timeout=_SUPABASE_TIMEOUT_SECONDS,
         )
@@ -75,16 +151,75 @@ def _insert_publish_job(payload: dict, owner_ref: str = "") -> str:
         return (
             f"✅ Yayin isi kuyruga eklendi (job_id={job_id or 'bilinmiyor'}). "
             "social-media-worker bu isi kendi dongusunde alip yayinlayacak; "
-            "durumu `publish_jobs` tablosundan (status/results alanlari) takip edin."
+            "durumu `worker_yayin_durumu_sorgula` ile takip edin."
         )
     except requests.HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else None
+        if status_code == 409:
+            existing = _lookup_job_by_idempotency_key(base_url, key_value, headers)
+            if existing:
+                return (
+                    "ℹ️ Bu istek daha once kuyruga eklenmis (idempotency_key eslesti); "
+                    "yeni bir is olusturulmadi. " + _format_job_status(existing)
+                )
         detay = exc.response.text[:500] if exc.response is not None else str(exc)
         return f"❌ Supabase isteği basarisiz: {detay}"
     except Exception as exc:
         return f"❌ Yayin isi eklenemedi: {exc}"
 
 
-def worker_video_yayinla(
+async def _require_publish_approval(action_id: str, description: str) -> str | None:
+    """Onay istenir; reddedilirse/kimse yoksa kullanici-okur bir ret metni dondurur, aksi halde None."""
+    approved = await request_tool_approval(action_id, description)
+    if approved:
+        return None
+    return (
+        "❌ Onay reddedildi (ya da bu surecte onaylayacak biri yok): "
+        f"{description}. Is kuyruga EKLENMEDI."
+    )
+
+
+def worker_yayin_durumu_sorgula(job_id: str) -> str:
+    """
+    `worker_video_yayinla` veya `worker_instagram_carousel_yayinla`'nin
+    dondurdugu job_id icin `publish_jobs` tablosundaki guncel durumu
+    (status: queued/processing/done/failed, results, error) sorgular.
+    Bir yayin isteginin gercekten basarili olup olmadigini SADECE bu tool
+    ile ogrenebilirsin — kuyruga ekleme mesaji ("✅ kuyruga eklendi") henuz
+    yayinlandigi anlamina gelmez.
+
+    Args:
+        job_id: Kuyruga ekleme sirasinda donen job_id.
+    """
+    clean_id = (job_id or "").strip()
+    if not clean_id:
+        return "❌ Hata: job_id bos olamaz."
+
+    config = _supabase_config()
+    if isinstance(config, str):
+        return config
+    base_url, key = config
+
+    try:
+        response = requests.get(
+            f"{base_url}/rest/v1/publish_jobs",
+            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            params={"id": f"eq.{clean_id}", "select": "*", "limit": "1"},
+            timeout=_SUPABASE_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        rows = response.json()
+        if not isinstance(rows, list) or not rows:
+            return f"❌ '{clean_id}' id'li bir yayin isi bulunamadi."
+        return _format_job_status(rows[0])
+    except requests.HTTPError as exc:
+        detay = exc.response.text[:500] if exc.response is not None else str(exc)
+        return f"❌ Supabase isteği basarisiz: {detay}"
+    except Exception as exc:
+        return f"❌ Durum sorgulanamadi: {exc}"
+
+
+async def worker_video_yayinla(
     video_url: str,
     platforms: str,
     baslik: str = "",
@@ -97,7 +232,7 @@ def worker_video_yayinla(
     Zaten HTTPS uzerinde barindirilan bir videoyu social-media-worker
     araciligiyla Instagram/YouTube/TikTok'a yayinlamak icin kuyruga bir
     `video.publish` isi ekler. Worker'in kendisi gercekten yayinlar; bu arac
-    sadece isi olusturur.
+    sadece isi olusturur (ve once onay ister — bkz. modul docstring'i).
 
     Args:
         video_url: Videonun HTTPS adresi (yerel dosya yolu KABUL EDILMEZ).
@@ -147,10 +282,20 @@ def worker_video_yayinla(
     if credential_ref.strip():
         payload["credentialRef"] = credential_ref.strip()
 
+    rejection = await _require_publish_approval(
+        action_id=f"worker_video_yayinla:{_idempotency_key(payload)}",
+        description=(
+            f"Video yayinla — platformlar: {', '.join(platform_listesi)}; "
+            f"gizlilik: {gizlilik}; baslik: '{baslik.strip() or '-'}'; url: {video_url.strip()}"
+        ),
+    )
+    if rejection:
+        return rejection
+
     return _insert_publish_job(payload, owner_ref=credential_ref.strip())
 
 
-def worker_instagram_carousel_yayinla(
+async def worker_instagram_carousel_yayinla(
     image_urls: str,
     caption: str = "",
     credential_ref: str = "",
@@ -158,7 +303,7 @@ def worker_instagram_carousel_yayinla(
     """
     Zaten HTTPS uzerinde barindirilan 2-10 JPEG gorseli social-media-worker
     araciligiyla Instagram carousel olarak yayinlamak icin kuyruga bir
-    `instagram.carousel` isi ekler.
+    `instagram.carousel` isi ekler (ve once onay ister — bkz. modul docstring'i).
 
     Args:
         image_urls: Virgulle ayrilmis, https:// ile baslayan 2-10 gorsel
@@ -184,5 +329,12 @@ def worker_instagram_carousel_yayinla(
         payload["caption"] = caption.strip()
     if credential_ref.strip():
         payload["credentialRef"] = credential_ref.strip()
+
+    rejection = await _require_publish_approval(
+        action_id=f"worker_instagram_carousel_yayinla:{_idempotency_key(payload)}",
+        description=f"Instagram carousel yayinla — {len(url_listesi)} gorsel; caption: '{caption.strip() or '-'}'",
+    )
+    if rejection:
+        return rejection
 
     return _insert_publish_job(payload, owner_ref=credential_ref.strip())

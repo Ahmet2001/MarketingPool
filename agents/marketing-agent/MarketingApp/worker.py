@@ -36,6 +36,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import uuid
 
 import uvicorn
 from dotenv import load_dotenv
@@ -167,6 +168,11 @@ def _build_mcp_run_task(mimar_agent: MimarAgent):
                     {"task": task, "context": context},
                     owner_ref="mcp",
                     status="processing",
+                    # Her MCP cagrisi ayri bir olaydir (retry yok, bkz.
+                    # insert_agent_job docstring'i) -- ayni task/context'le
+                    # yapilan ONCEKI bir cagriya yanlislikla eslesip audit
+                    # satirinin ustune yazilmasin diye her zaman benzersiz.
+                    idempotency_key=uuid.uuid4().hex,
                 )
             except agent_job_queue.AgentJobQueueError as exc:
                 print(f"⚠️ [Worker] MCP audit-trail insert atlandi: {exc}")
