@@ -80,7 +80,17 @@ DEFAULT_BUILTIN_AGENTS = [
         "name": "asset_collector_agent",
         "type": "builtin",
         "enabled": True,
-        "description": "App'in onayladigi medya varliklarini (video, gorsel, ses, dokuman) listeleme ve detaylandirma ajani.",
+        "description": "App'in onayli medya varliklarini listeleme, yayina hazirlama/dogrulama ve App'ten video uretimi isteme ajani.",
+        "model": "default",
+        "tool_mode": "default",
+        "system_prompt": "",
+        "tools": [],
+    },
+    {
+        "name": "platform_data_agent",
+        "type": "builtin",
+        "enabled": True,
+        "description": "Platformlardan (YouTube, Instagram, TikTok, X, Reddit) manifest-onayli, salt-okunur metrik/yorum/hesap verisi toplama ajani.",
         "model": "default",
         "tool_mode": "default",
         "system_prompt": "",
@@ -161,6 +171,10 @@ def default_system_prompt_placeholder(agent: dict[str, Any] | None = None) -> st
             return DEFAULT_SYSTEM_PROMPT + _runtime_system_prompt_note()
         if name == "asset_collector_agent":
             from .SubModels.asset_collector import DEFAULT_SYSTEM_PROMPT
+
+            return DEFAULT_SYSTEM_PROMPT + _runtime_system_prompt_note()
+        if name == "platform_data_agent":
+            from .SubModels.platform_data_agent import DEFAULT_SYSTEM_PROMPT
 
             return DEFAULT_SYSTEM_PROMPT + _runtime_system_prompt_note()
         if agent_type == "builtin" and _is_scaffolded_builtin_agent(name):
@@ -1462,8 +1476,10 @@ def _category_for_tool(name: str, group: str, source: str = "builtin") -> str:
         return "web" if name == "web_arama" else "content"
     if "instagram" in name or "youtube" in name or "_x_" in name or name.startswith(("publish_x", "reply_to_x", "send_x", "scan_x", "get_x", "launch_x", "open_x", "close_x")):
         return "social"
-    if name.startswith("app_") or group == "asset_collector_agent":
+    if name.startswith(("app_", "medya_", "video_uretimi")) or group == "asset_collector_agent":
         return "content"
+    if name.startswith("platform_veri_") or group == "platform_data_agent":
+        return "social"
     if group in {"content_creator_agent"}:
         return "content"
     if group in {"sosyal_medya_agent"}:
@@ -1496,6 +1512,7 @@ def _risk_for_tool(name: str, category: str, source: str = "builtin") -> str:
         "browser_dosya",
         "browser_sekme_kapat",
         "browser_kapat",
+        "video_uretimi_iste",
     )
     if any(marker in name for marker in high_markers):
         return "high"
@@ -1515,6 +1532,7 @@ def _builtin_tool_groups() -> dict[str, list[Callable]]:
         "sosyal_medya_agent": list(araclar.SOSYAL_MEDYA_ARACLARI),
         "content_creator_agent": list(araclar.CONTENT_CREATOR_ARACLARI),
         "asset_collector_agent": list(araclar.ASSET_COLLECTOR_ARACLARI),
+        "platform_data_agent": list(araclar.PLATFORM_DATA_ARACLARI),
         "sistem_agent": list(araclar.SISTEM_ARACLARI),
         "arastirma_agent": list(araclar.ARAMA_ARACLARI),
         "kod_agent": list(araclar.KOD_ARACLARI),

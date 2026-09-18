@@ -18,14 +18,27 @@ storage.
 
 ## What actually works today (honest scope)
 
-The `future_work.md` "Planned worker environment interface"
-(`collect_assets`, `collect_platform_data`, `prepare_media`,
-`request_video_generation`, `execute_publish`) is **not implemented
-upstream yet** — it's a roadmap, not a live HTTP surface. This agent does
-not pretend otherwise. The one integration point that genuinely exists
-today is [`social-media-worker`](../../social-media-worker)'s `publish_jobs`
-Supabase queue, which accepts exactly two schema-valid actions:
-`video.publish` and `instagram.carousel`
+The `future_work.md` "Planned worker environment interface" now has a
+concrete agent-side implementation for all five items — but "implemented on
+the agent side" and "there's a live App to talk to" are different claims,
+and this repo is honest about which is which:
+
+| Capability | Agent side | Needs from the App / a worker |
+| --- | --- | --- |
+| `collect_assets` | `asset_collector_agent`: `app_asset_listele`/`app_asset_detay` | An [asset-pool](../../asset-pool)-shaped `GET /api/assets` — build your own or use the kit |
+| `prepare_media` | `asset_collector_agent`: `medya_dogrula`/`medya_hazirla` | Optional `POST {id}/prepare`; without it, the listed asset is validated as-is |
+| `request_video_generation` | `asset_collector_agent`: `video_uretimi_iste`/`video_uretimi_durumu` | Optional `POST /api/video-requests`; without it, the tool returns a clear "not implemented" error |
+| `collect_platform_data` | `platform_data_agent`: `platform_veri_*` | The standalone [`platform_data_worker`](../../platform_data_worker) — a real, runnable worker, not a stub |
+| `execute_publish` | `sosyal_medya_agent`: `worker_video_yayinla`/`worker_instagram_carousel_yayinla`/`worker_yayin_durumu_sorgula` | [`social-media-worker`](../../social-media-worker), which is real and running today |
+
+Two of the five (`execute_publish` and `collect_platform_data`) have a real
+worker on the other end right now. The other three depend on an App this
+repository doesn't contain — every tool for them fails with a clear
+configuration error instead of fabricating data when that App piece isn't
+there (see each section below).
+
+`social-media-worker`'s `publish_jobs` queue accepts exactly two
+schema-valid actions: `video.publish` and `instagram.carousel`
 (see [`schemas/publish_request.schema.json`](../../schemas/publish_request.schema.json)).
 
 `MarketingApp/araclar/worker_yayinlama_araclari.py` adds three tools used by
@@ -35,7 +48,10 @@ the `sosyal_medya_agent` sub-agent:
   request against the schema's constraints (HTTPS URLs, platform enum,
   length limits), **require approval** (see below) and insert a row into
   `publish_jobs` via the Supabase REST API. The worker itself performs the
-  actual publish; this agent only queues a validated, approved job.
+  actual publish; this agent only queues a validated, approved job. Each
+  also accepts a `media_ref` instead of a raw URL — the handle
+  `medya_hazirla` returns (see "Preparing media for publish" below) — so a
+  signed App URL never has to pass through the model as plain text.
 - `worker_yayin_durumu_sorgula(job_id)` reads that row back — `status`,
   `results`, `error`, matching
   [`schemas/publish_result.schema.json`](../../schemas/publish_result.schema.json).
@@ -139,17 +155,25 @@ side: a new `asset_collector_agent` sub-agent with three tools
 (`app_baglanti_durumu`, `app_asset_listele`, `app_asset_detay`, in
 [`MarketingApp/araclar/app_asset_araclari.py`](./MarketingApp/araclar/app_asset_araclari.py))
 that read approved media assets — matching
-[`schemas/asset.schema.json`](../../schemas/asset.schema.json) — from the
-App over plain HTTP (`GET {APP_INTERNAL_URL}/api/assets` and
-`GET {APP_INTERNAL_URL}/api/assets/{id}`, bearer-token auth).
+[`schemas/asset.schema.json`](../../schemas/asset.schema.json) — from **any
+app** that implements the [asset-pool contract](../../asset-pool/README.md):
+`GET {APP_INTERNAL_URL}{APP_ASSETS_PATH}` and
+`GET {APP_INTERNAL_URL}{APP_ASSETS_PATH}/{id}` (default path `/api/assets`),
+bearer-token auth. The agent is not coupled to any particular app.
 
-**Honest scope:** the App does not expose this endpoint yet (same "roadmap,
-not a live HTTP surface" caveat as the worker section above). Until
-`APP_INTERNAL_URL` is set, every call returns a clear configuration error
-instead of silently failing or fabricating data. Once the App implements
-the two-endpoint contract described in `app_asset_araclari.py`'s module
-docstring, setting `APP_INTERNAL_URL` (and `APP_INTERNAL_TOKEN` if the App
-requires it) is enough to make it work — no code changes needed.
+To automate your own app, implement those two endpoints — the
+[`asset-pool/`](../../asset-pool) kit is a dependency-free handler plus a
+conformance checker (`node asset-pool/bin/check.js <url> --token …`) — then
+set `APP_INTERNAL_URL` / `APP_INTERNAL_TOKEN` (and `APP_ASSETS_PATH` if you
+mounted it elsewhere). [Kara Tahta](../../asset-pool/examples/karatahta) is
+included purely as a worked example of mapping a real app onto the contract.
+
+**Honest scope:** this repository contains no live App. The kit and the Kara
+Tahta example are tested against fakes and a local reference server, and the
+agent's tools were exercised over real HTTP against `asset-pool`'s minimal
+example — but the Kara Tahta example has not been run against a live Kara Tahta
+deployment. Until `APP_INTERNAL_URL` is set, every call returns a clear
+configuration error instead of silently failing or fabricating data.
 
 These tools are read-only by design: no credentials, upload, or approval-state
 mutation ever happens through them, per the responsibility map's "does not
@@ -157,6 +181,121 @@ own: direct secret access" rule for this agent. A successful listing is also
 cached to `workspace/assets/app_asset_catalog.json` so `content_creator_agent`
 and `sosyal_medya_agent` can reference the same asset URLs without re-querying
 the App.
+
+## Preparing media for publish (new)
+
+`future_work.md` item #3 (`prepare_media`). Two tools in
+[`MarketingApp/araclar/medya_araclari.py`](./MarketingApp/araclar/medya_araclari.py),
+both on `asset_collector_agent`:
+
+- `medya_dogrula(url, aksiyon, platformlar)` checks an arbitrary HTTPS URL
+  against the exact constraints `social-media-worker` enforces — reachable,
+  correct content type, a Content-Length when YouTube/TikTok's upload needs
+  one, TikTok's 64 MB single-chunk cap, Instagram carousels' JPEG-only rule
+  (see `social-media-worker/services/{youtubePublish,tiktokPublish,instagramPublish}.js`,
+  cited in the module's own comments) — **before** a publish job is queued,
+  not after `social-media-worker` rejects it.
+- `medya_hazirla(asset_ids, aksiyon, platformlar, ttl_saniye)` does the same
+  for App-approved assets: it calls the asset pool's optional
+  `POST {id}/prepare` if the App implements it (falls back to the listed
+  asset if not — see `asset-pool/README.md`), runs it through the same
+  checks, and on success returns an opaque **`media_ref`** instead of the
+  real URL.
+
+That last point matters: `future_work.md`'s security rules say signed URLs
+must never enter an LLM prompt. A prepared asset's URL is exactly that kind
+of URL, so it's never handed to the model — `medya_hazirla` stores it in
+[`environments/media_registry.py`](./MarketingApp/environments/media_registry.py)
+(a small workspace-local file, chmod 600) and returns a `media_ref` handle
+the model can safely see and pass along. `worker_video_yayinla` /
+`worker_instagram_carousel_yayinla` accept `media_ref` as an alternative to
+`video_url`/`image_urls` and resolve it themselves; a ref is scoped to the
+exact `(action, platforms)` it was prepared for and expires with the
+underlying URL (max 6h), so it can't be replayed for a different publish
+than the one it was checked against. Any URL these tools log or print is
+masked to `https://host/path?…` first.
+
+Both tools fetch the media themselves to check it, which means SSRF is a
+real concern for arbitrary URLs (`medya_dogrula`): every host is resolved
+and every IP checked as globally routable (rejecting loopback/private/
+link-local ranges) before each request, including after every redirect hop.
+This narrows the window but doesn't close a DNS-rebinding race between the
+check and the fetch — these tools are advisory, not a security boundary;
+`social-media-worker` still validates independently when it actually
+publishes.
+
+## Requesting video generation (new)
+
+`future_work.md` item #4 (`request_video_generation`) — the one item that
+would otherwise mean a real architecture change (content_creator_agent
+currently renders locally via Playwright/stock footage; this is the
+alternative path of asking the App to render instead). Two tools in
+[`MarketingApp/araclar/video_uretim_araclari.py`](./MarketingApp/araclar/video_uretim_araclari.py),
+on `asset_collector_agent`:
+
+- `video_uretimi_iste(brief, baslik, sure_saniye, yonelim, dil)` — `brief`
+  is a plain-text description, explicitly **not** a command (the future_work.md
+  wording: "the agent supplies a brief, not executable infrastructure
+  commands"); code fences and control characters are rejected outright so a
+  brief can't smuggle instructions. Two safety rails apply before anything
+  is sent, because generation can be expensive and isn't easily undone:
+  - **Approval**, via the same `approval_runtime` gate as publishing —
+    `VIDEO_GENERATION_REQUIRES_APPROVAL` (default `true`) can turn it off
+    for a deployment that has wired its own headless approval flow.
+  - **A daily cap** (`VIDEO_GENERATION_MAX_PER_DAY`, default 3) counting
+    distinct requests in the last 24h, tracked in a small workspace log.
+  An `Idempotency-Key` (derived from the request content) also goes on the
+  HTTP call itself, so a retried request never starts a second render on
+  the App's side either.
+- `video_uretimi_durumu(request_id)` polls `GET {video-requests}/{id}`.
+
+**The result is a draft, not a publishable asset.** A `done` status's
+`asset` is marked `approval: "pending"` unless the App has explicitly
+approved it — and this agent treats "not in the asset pool yet"
+(`app_asset_detay` returning 404) as exactly that: not approved. The
+system prompt tells `asset_collector_agent` to say so plainly rather than
+treat a finished render as ready to publish.
+
+Same honest-scope rule as the rest of this section: without an App that
+implements `POST {APP_INTERNAL_URL}{APP_VIDEO_REQUESTS_PATH}` (default
+`/api/video-requests` — see `asset-pool/README.md`), both tools return a
+clear "not implemented" error. [Kara Tahta](../../asset-pool/examples/karatahta/videoSource.js)
+is included as a worked example (Kara Tahta's own `/api/generate-lesson` /
+`/api/jobs/:id`), tested against a fake backend, not a live one.
+
+## Collecting platform data (new)
+
+`future_work.md` item #2 (`collect_platform_data`) — the one capability
+that needs a **second, standalone worker**, because it needs platform
+credentials this agent must never hold. Three tools in
+[`MarketingApp/araclar/platform_veri_araclari.py`](./MarketingApp/araclar/platform_veri_araclari.py),
+now on their own sub-agent, `platform_data_agent` (kept separate from
+`sosyal_medya_agent` so a purely read-only analysis task can run without
+ever touching the browser-based social tools):
+
+- `platform_veri_eylemleri(platform)` lists what can be collected.
+- `platform_veri_topla(platform, eylem, parametreler, bekleme_saniye)`
+  queues a request and waits (briefly) for the answer.
+- `platform_veri_durumu(job_id)` polls it later if it didn't finish in time.
+
+These insert into a new `platform_data_jobs` Supabase table (migration:
+[`migrations/001_agent_jobs.sql`](./migrations/001_agent_jobs.sql)'s sibling
+in [`../../platform_data_worker/migrations/`](../../platform_data_worker/migrations))
+and read the result back — the agent process never holds a YouTube, Instagram,
+TikTok, X, or Reddit credential. **[`platform_data_worker`](../../platform_data_worker)
+is the real thing here**, not a stub behind a future App: it's a standalone,
+runnable worker (own `requirements.txt`, own `README.md`) that holds those
+credentials, checks every request against a hand-written allowlist in each
+platform's `toolboxes/*/manifest.yaml` (`data_collection.actions:` — every
+write action is absent from that list by construction), and runs the one
+approved read-only toolbox function that matches. The agent's own
+pre-check duplicates those same rules for a fast local rejection, but the
+worker's copy is the one that's actually enforced; a test in that worker's
+suite (`test_agent_policy_parity.py`) keeps the two from drifting apart.
+
+Without `platform_data_worker` running (or without `SUPABASE_URL`/
+`SUPABASE_AGENT_KEY`/`SUPABASE_SECRET_KEY` set), a request just sits queued
+and `platform_veri_topla` says so plainly rather than inventing metrics.
 
 ## Running the agent as a worker (new)
 

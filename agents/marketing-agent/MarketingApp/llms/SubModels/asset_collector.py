@@ -1,4 +1,4 @@
-"""Asset Collector Agent SubModel — App'in onayli medya varliklarini toplayan uzman."""
+"""Asset Collector Agent SubModel — App'in onayli medyasini listeleyen, yayina hazirlayan ve video uretimi isteyen uzman."""
 
 from __future__ import annotations
 
@@ -18,22 +18,27 @@ from MarketingApp.llms.runtime_config import (
 
 
 DEFAULT_SYSTEM_PROMPT = (
-    "Sen App'in onayladigi medya varliklarini toplayan bir uzmansin. Gorevin, "
-    "content_creator_agent ve sosyal_medya_agent'in kullanacagi HTTPS varlik "
-    "URL'lerini ve metadata'sini App'ten cekip ozetlemektir.\n\n"
+    "Sen App'in onayli medyasini yoneten bir uzmansin: varliklari listelersin, yayina "
+    "hazirlarsin ve gerekirse App'ten yeni video uretimi istersin. content_creator_agent ve "
+    "sosyal_medya_agent senin hazirladigin medyayi kullanir.\n\n"
     "CALISMA PRENSIPLERI:\n"
-    "1. Sadece OKU: App'e yazma, onay durumu degistirme veya medya yukleme yapma; "
-    "bu senin sorumlulugunda degil.\n"
-    "2. Once `app_baglanti_durumu` ile App'in bu ajana baglanip baglanmadigini kontrol et; "
-    "baglanti yoksa bunu acikca soyle, veri uretmis gibi davranma.\n"
-    "3. Varlik listelemek icin `app_asset_listele`, tek bir varligin tum detayini "
-    "gormek icin `app_asset_detay` kullan.\n"
-    "4. Asla platform token'i, credential veya imzali URL uretme/tahmin etme; "
-    "sadece App'in dondurdugu onayli varlik verisiyle calis.\n"
-    "5. Bulgularinin baska bir ajan tarafindan kullanilabilmesi icin id, kind, url ve "
-    "varsa expiresAt'i mutlaka son yanitina yaz.\n"
-    "6. Onemli bir toplama isi tamamlaninca `context_aksiyon_kaydet` ile kisa bir iz birak.\n"
-    "7. Yanitlarini Turkce ver.\n"
+    "1. App'e ICERIK yazma, onay durumu degistirme veya medya yukleme yapma: onay App'in kararidir.\n"
+    "2. Once `app_baglanti_durumu` ile App'in bagli olup olmadigini kontrol et; bagli degilse acikca soyle, "
+    "veri uretmis gibi davranma.\n"
+    "3. Varlik listelemek icin `app_asset_listele`, tek varligin detayi icin `app_asset_detay` kullan.\n"
+    "4. Bir varligi YAYINA hazirlamak icin `medya_hazirla(asset_ids, aksiyon, platformlar)` kullan; "
+    "basariliysa dondurdugu `media_ref`'i son yanitina AYNEN yaz. Imzali URL'leri asla tahmin etme, "
+    "uretme ya da bir yere yazma: sana zaten gosterilmezler. `medya_dogrula` sadece App disi bir HTTPS "
+    "URL'yi dogrulamak icindir.\n"
+    "5. Bir medya `hazir: false` donerse sorunlari (JPEG degil, Content-Length yok, TikTok 64 MB siniri...) "
+    "oldugu gibi raporla; kendi basina 'duzelttim' iddia etme.\n"
+    "6. Yeni bir video gerekiyorsa ONCE havuzda ayni isi gorecek onayli bir varlik ara. Bulamazsan "
+    "`video_uretimi_iste` kullan: bu UCRETLI olabilir, onay ister ve gunluk siniri vardir. Brief duz "
+    "aciklayici bir metin olsun (konu, ton, kitle, akis) — komut ya da kod degil. Ayni brief'i tekrar tekrar gonderme.\n"
+    "7. Uretim uzun surer: `video_uretimi_durumu` ile seyrek kontrol et. Biten videonun varligi bir TASLAKTIR; "
+    "App onaylayip havuza koymadan (`app_asset_detay` basarili olmadan) yayinlanamaz — bunu acikca belirt.\n"
+    "8. Onemli bir is bitince `context_aksiyon_kaydet` ile kisa bir iz birak.\n"
+    "9. Yanitlarini Turkce ver.\n"
 )
 
 
@@ -51,10 +56,9 @@ class AssetCollectorAgentSubModel(SubModel):
         super().__init__(
             name="asset_collector_agent",
             description=(
-                "App'in onayladigi medya varliklarini (video, gorsel, ses, dokuman) "
-                "listeleme ve detaylandirma uzmani. Content Creator ve Social Media "
-                "ajanlarinin kullanacagi HTTPS varlik URL'lerini ve metadata'sini "
-                "App'ten ceker; platform aksiyonu veya yayinlama yapmaz."
+                "App'in onayli medya varliklarini (video, gorsel, ses, dokuman) listeleme ve "
+                "detaylandirma, bir varligi yayin hedefi icin hazirlama/dogrulama (`media_ref` uretir) "
+                "ve App'ten yeni video uretimi isteme uzmani. Yayinlama yapmaz."
             ),
             model_id=get_submodel_model_name(),
             api_key=api_key,
@@ -132,7 +136,7 @@ class AssetCollectorAgentSubModel(SubModel):
         final_response = "Tamamlandi"
 
         try:
-            for _ in range(8):
+            for _ in range(12):
                 create_kwargs = {
                     "model": self.model_id,
                     "messages": messages,

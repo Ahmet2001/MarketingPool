@@ -22,3 +22,24 @@ actions:
     supervised_local_only: true
     function_prefixes: [launch_tiktok_browser, open_tiktok_page, like_tiktok_video, unlike_tiktok_video, follow_tiktok_account, unfollow_tiktok_account, comment_tiktok_video, publish_tiktok_video]
     writes_external_state: true
+data_collection:
+  # Read-only actions the platform-data worker (../platform_data_worker) may run for
+  # the agent. This is an ALLOWLIST: an action or param that is not listed here is
+  # refused, and only get_/search_/list_ functions may ever be named. `function`
+  # is looked up in api/toolbox.py; params not declared below are rejected, so the
+  # toolbox's `fields`/`part`/`user_id` style knobs stay at their defaults
+  # (own account, default field set). personal_data marks actions whose result
+  # contains other people's content (comment authors and text).
+  actions:
+    user_info:
+      function: get_tiktok_api_user_info
+      description: Profile of the authorized account.
+      rate_limit_per_hour: 60
+      params: {}
+    videos:
+      function: list_tiktok_api_videos
+      description: The authorized account's public videos with view/like/comment/share counts.
+      rate_limit_per_hour: 60
+      params:
+        cursor: {type: integer, minimum: 0}
+        max_count: {type: integer, minimum: 1, maximum: 20}

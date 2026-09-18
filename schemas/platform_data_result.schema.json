@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/example/marketing-agent-assets/schemas/platform_data_result.schema.json",
+  "title": "Platform Data Result",
+  "type": "object",
+  "required": ["jobId", "status", "results"],
+  "properties": {
+    "jobId": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["queued", "processing", "done", "failed"] },
+    "results": {
+      "type": "object",
+      "properties": {
+        "ok": { "type": "boolean" },
+        "platform": { "type": "string" },
+        "action": { "type": "string" },
+        "data": {},
+        "truncated": { "type": "boolean" },
+        "error": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "error": { "type": "string" }
+  },
+  "additionalProperties": false
+}

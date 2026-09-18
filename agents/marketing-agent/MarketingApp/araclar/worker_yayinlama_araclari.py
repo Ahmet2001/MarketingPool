@@ -41,6 +41,7 @@ import os
 import requests
 
 from MarketingApp.environments.approval_runtime import request_tool_approval
+from MarketingApp.environments.media_registry import mask_url, resolve as resolve_media_ref
 
 _ALLOWED_VIDEO_PLATFORMS = {"instagram", "youtube", "tiktok"}
 _SUPABASE_TIMEOUT_SECONDS = 15
@@ -220,13 +221,14 @@ def worker_yayin_durumu_sorgula(job_id: str) -> str:
 
 
 async def worker_video_yayinla(
-    video_url: str,
-    platforms: str,
+    video_url: str = "",
+    platforms: str = "",
     baslik: str = "",
     aciklama: str = "",
     caption: str = "",
     gizlilik: str = "private",
     credential_ref: str = "",
+    media_ref: str = "",
 ) -> str:
     """
     Zaten HTTPS uzerinde barindirilan bir videoyu social-media-worker
@@ -236,6 +238,8 @@ async def worker_video_yayinla(
 
     Args:
         video_url: Videonun HTTPS adresi (yerel dosya yolu KABUL EDILMEZ).
+            App varliklari icin bunu KULLANMA; `medya_hazirla`'nin dondurdugu
+            media_ref'i ver (imzali URL'ler modele hic gosterilmez).
         platforms: Virgulle ayrilmis platform listesi. Gecerli degerler:
             instagram, youtube, tiktok (orn: "instagram,youtube").
         baslik: Video basligi (YouTube icin zorunlu, en fazla 100 karakter).
@@ -244,10 +248,8 @@ async def worker_video_yayinla(
         gizlilik: private, unlisted veya public (varsayilan private).
         credential_ref: Coklu-hesap kurulumlarinda hangi hesabin kullanilacagini
             belirten referans (opsiyonel).
+        media_ref: `medya_hazirla`'nin dondurdugu hazir-medya kimligi (video_url yerine).
     """
-    if not _is_https_url(video_url):
-        return "❌ Hata: video_url https:// ile baslayan bir adres olmali."
-
     platform_listesi = [p.strip().lower() for p in (platforms or "").split(",") if p.strip()]
     if not platform_listesi:
         return "❌ Hata: en az bir platform belirtin (instagram, youtube, tiktok)."
@@ -255,6 +257,18 @@ async def worker_video_yayinla(
     if gecersiz:
         return f"❌ Hata: gecersiz platform(lar): {', '.join(gecersiz)}. Izin verilenler: instagram, youtube, tiktok."
     platform_listesi = list(dict.fromkeys(platform_listesi))  # uniqueItems
+
+    if media_ref.strip():
+        if video_url.strip():
+            return "❌ Hata: video_url ve media_ref birlikte verilemez; yalnizca birini kullan."
+        resolved, reason = resolve_media_ref(media_ref, action="video.publish", platforms=platform_listesi)
+        if reason:
+            return f"❌ Hata: {reason}"
+        if len(resolved) != 1:
+            return "❌ Hata: media_ref tek bir video icermeli."
+        video_url = resolved[0]
+    if not _is_https_url(video_url):
+        return "❌ Hata: video_url https:// ile baslayan bir adres olmali (ya da media_ref ver)."
 
     if gizlilik not in {"private", "unlisted", "public"}:
         return "❌ Hata: gizlilik 'private', 'unlisted' veya 'public' olmali."
@@ -286,7 +300,7 @@ async def worker_video_yayinla(
         action_id=f"worker_video_yayinla:{_idempotency_key(payload)}",
         description=(
             f"Video yayinla — platformlar: {', '.join(platform_listesi)}; "
-            f"gizlilik: {gizlilik}; baslik: '{baslik.strip() or '-'}'; url: {video_url.strip()}"
+            f"gizlilik: {gizlilik}; baslik: '{baslik.strip() or '-'}'; url: {mask_url(video_url.strip())}"
         ),
     )
     if rejection:
@@ -296,9 +310,10 @@ async def worker_video_yayinla(
 
 
 async def worker_instagram_carousel_yayinla(
-    image_urls: str,
+    image_urls: str = "",
     caption: str = "",
     credential_ref: str = "",
+    media_ref: str = "",
 ) -> str:
     """
     Zaten HTTPS uzerinde barindirilan 2-10 JPEG gorseli social-media-worker
@@ -308,10 +323,19 @@ async def worker_instagram_carousel_yayinla(
     Args:
         image_urls: Virgulle ayrilmis, https:// ile baslayan 2-10 gorsel
             adresi (orn: "https://cdn.example.com/1.jpg,https://cdn.example.com/2.jpg").
+            App varliklari icin bunu KULLANMA; `medya_hazirla`'nin media_ref'ini ver.
         caption: Carousel altyazisi (en fazla 2200 karakter).
         credential_ref: Coklu-hesap kurulumlarinda hangi hesabin kullanilacagini
             belirten referans (opsiyonel).
+        media_ref: `medya_hazirla`'nin dondurdugu hazir-medya kimligi (image_urls yerine).
     """
+    if media_ref.strip():
+        if image_urls.strip():
+            return "❌ Hata: image_urls ve media_ref birlikte verilemez; yalnizca birini kullan."
+        resolved, reason = resolve_media_ref(media_ref, action="instagram.carousel", platforms=["instagram"])
+        if reason:
+            return f"❌ Hata: {reason}"
+        image_urls = ",".join(resolved)
     url_listesi = [u.strip() for u in (image_urls or "").split(",") if u.strip()]
     if len(url_listesi) < 2 or len(url_listesi) > 10:
         return "❌ Hata: image_urls 2 ile 10 arasinda https gorsel adresi icermeli."
@@ -332,7 +356,7 @@ async def worker_instagram_carousel_yayinla(
 
     rejection = await _require_publish_approval(
         action_id=f"worker_instagram_carousel_yayinla:{_idempotency_key(payload)}",
-        description=f"Instagram carousel yayinla — {len(url_listesi)} gorsel; caption: '{caption.strip() or '-'}'",
+        description=f"Instagram carousel yayinla — {len(url_listesi)} gorsel ({mask_url(url_listesi[0])} …); caption: '{caption.strip() or '-'}'",
     )
     if rejection:
         return rejection

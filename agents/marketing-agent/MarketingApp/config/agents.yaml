@@ -57,6 +57,8 @@ agents:
   - worker_video_yayinla
   - worker_instagram_carousel_yayinla
   - worker_yayin_durumu_sorgula
+  - medya_hazirla
+  - medya_dogrula
   - workspace_ekle
   - workspace_listele
   - workspace_oku
@@ -85,8 +87,17 @@ agents:
 - name: asset_collector_agent
   type: builtin
   enabled: true
-  description: App'in onayladigi medya varliklarini (video, gorsel, ses, dokuman)
-    listeleme ve detaylandirma ajani.
+  description: App'in onayli medya varliklarini listeleme, yayina hazirlama/dogrulama
+    ve App'ten video uretimi isteme ajani.
+  model: gemma-4-26b-a4b-it
+  tool_mode: default
+  system_prompt: ''
+  tools: []
+- name: platform_data_agent
+  type: builtin
+  enabled: true
+  description: Platformlardan (YouTube, Instagram, TikTok, X, Reddit) manifest-onayli,
+    salt-okunur metrik/yorum/hesap verisi toplama ajani.
   model: gemma-4-26b-a4b-it
   tool_mode: default
   system_prompt: ''

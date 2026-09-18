@@ -29,3 +29,53 @@ actions:
     supervised_local_only: true
     function_prefixes: [launch_x_browser, open_x_page, publish_x_post, reply_to_x_post, like_x_post, bookmark_x_post, repost_x_post, follow_x_account]
     writes_external_state: true
+data_collection:
+  # Read-only actions the platform-data worker (../platform_data_worker) may run for
+  # the agent. This is an ALLOWLIST: an action or param that is not listed here is
+  # refused, and only get_/search_/list_ functions may ever be named. `function`
+  # is looked up in api/toolbox.py; params not declared below are rejected, so the
+  # toolbox's `fields`/`part`/`user_id` style knobs stay at their defaults
+  # (own account, default field set). personal_data marks actions whose result
+  # contains other people's content (comment authors and text).
+  actions:
+    me:
+      function: get_x_api_me
+      description: The account behind the configured user-context credentials.
+      rate_limit_per_hour: 30
+      params: {}
+    user:
+      function: get_x_api_user
+      description: Public profile of an account by username or numeric id.
+      rate_limit_per_hour: 60
+      require_one_of: [username, user_id]
+      params:
+        username: {type: string, max_length: 50, pattern: '^@?[A-Za-z0-9_]{1,50}$'}
+        user_id: {type: string, max_length: 30, pattern: '^[0-9]{1,30}$'}
+    post:
+      function: get_x_api_post
+      description: One post by id or URL, with its public metrics.
+      rate_limit_per_hour: 120
+      params:
+        tweet_id_or_url: {type: string, required: true, max_length: 300}
+    search_posts:
+      function: search_x_api_posts
+      description: Recent (7-day) public post search.
+      personal_data: true
+      rate_limit_per_hour: 30
+      params:
+        query: {type: string, required: true, max_length: 512}
+        max_results: {type: integer, minimum: 10, maximum: 100}
+        next_token: {type: string, max_length: 200}
+        sort_order: {type: string, enum: [recency, relevancy]}
+    user_posts:
+      function: get_x_api_user_posts
+      description: Recent posts by an account.
+      rate_limit_per_hour: 60
+      require_one_of: [username, user_id]
+      params:
+        username: {type: string, max_length: 50, pattern: '^@?[A-Za-z0-9_]{1,50}$'}
+        user_id: {type: string, max_length: 30, pattern: '^[0-9]{1,30}$'}
+        max_results: {type: integer, minimum: 5, maximum: 100}
+        pagination_token: {type: string, max_length: 200}
+        exclude_replies: {type: boolean}
+        exclude_reposts: {type: boolean}

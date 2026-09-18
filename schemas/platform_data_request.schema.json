@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/example/marketing-agent-assets/schemas/platform_data_request.schema.json",
+  "title": "Platform Data Request",
+  "description": "A read-only request to collect platform data. `action` must be an action id declared under `data_collection.actions` in the platform's toolbox manifest; the worker rejects anything else and re-validates `params` against the manifest at execution time.",
+  "type": "object",
+  "required": ["platform", "action"],
+  "properties": {
+    "platform": { "enum": ["youtube", "instagram", "tiktok", "x", "reddit"] },
+    "action": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+    "params": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "integer", "boolean"] }
+    },
+    "credentialRef": { "type": "string", "maxLength": 200 }
+  },
+  "additionalProperties": false
+}

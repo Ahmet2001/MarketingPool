@@ -23,3 +23,43 @@ actions:
     supervised_local_only: true
     function_prefixes: [launch_reddit_browser, open_reddit_page, publish_reddit_text_post, publish_reddit_link_post, comment_reddit_post, reply_reddit_comment, upvote_reddit_post, join_reddit_community]
     writes_external_state: true
+data_collection:
+  # Read-only actions the platform-data worker (../platform_data_worker) may run for
+  # the agent. This is an ALLOWLIST: an action or param that is not listed here is
+  # refused, and only get_/search_/list_ functions may ever be named. `function`
+  # is looked up in api/toolbox.py; params not declared below are rejected, so the
+  # toolbox's `fields`/`part`/`user_id` style knobs stay at their defaults
+  # (own account, default field set). personal_data marks actions whose result
+  # contains other people's content (comment authors and text).
+  actions:
+    listing:
+      function: get_reddit_api_listing
+      description: Front-page or subreddit listing.
+      rate_limit_per_hour: 60
+      params:
+        subreddit: {type: string, max_length: 50, pattern: '^[A-Za-z0-9_]+$'}
+        sort: {type: string, enum: [hot, new, top, rising, controversial, best]}
+        time_filter: {type: string, enum: [hour, day, week, month, year, all]}
+        limit: {type: integer, minimum: 1, maximum: 100}
+        after: {type: string, max_length: 100}
+    search_posts:
+      function: search_reddit_api_posts
+      description: Post search, optionally inside one subreddit.
+      rate_limit_per_hour: 30
+      params:
+        query: {type: string, required: true, max_length: 512}
+        subreddit: {type: string, max_length: 50, pattern: '^[A-Za-z0-9_]+$'}
+        sort: {type: string, enum: [relevance, hot, top, new, comments]}
+        time_filter: {type: string, enum: [hour, day, week, month, year, all]}
+        limit: {type: integer, minimum: 1, maximum: 100}
+        after: {type: string, max_length: 100}
+    post:
+      function: get_reddit_api_post
+      description: One post with its comment tree.
+      personal_data: true
+      rate_limit_per_hour: 60
+      params:
+        post_id_or_url: {type: string, required: true, max_length: 300}
+        comment_sort: {type: string, enum: [confidence, top, new, controversial, old, qa]}
+        comment_limit: {type: integer, minimum: 1, maximum: 100}
+        depth: {type: integer, minimum: 0, maximum: 6}
