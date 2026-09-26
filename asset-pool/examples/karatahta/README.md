@@ -78,24 +78,29 @@ export const videoRequestHandler = createVideoRequestHandler({
 
 ## Wire it into Kara Tahta
 
-[`assetSource.js`](./assetSource.js) is the only Kara Tahta-specific file. It
-takes the app's functions as arguments rather than importing them, so it needs
-nothing from the app's source tree. In the app:
+This is actually wired into the real Kara Tahta app at
+`/home/rifat/Masaüstü/karatahta2` (not just described here) — the recipe
+below is exactly what was done, so you can diff against it:
 
-1. Copy the whole `asset-pool/src/` directory, plus `assetSource.js` and
-   (if you're also wiring video requests) `videoSource.js`, into e.g.
-   `services/assetPool/`.
-2. Add `routes/assetPool.js`:
+1. `asset-pool/src/*.js`, plus `assetSource.js` and `videoSource.js`, copied
+   as-is into `karatahta2/services/assetPool/`.
+2. [`karatahta2/routes/assetPool.js`](../../../../karatahta2/routes/assetPool.js
+   in a sibling checkout — this repo doesn't vendor Kara Tahta's source)
+   wires them to the app's real functions:
 
    ```js
    import { createAssetPoolHandler } from '../services/assetPool/handler.js';
+   import { createVideoRequestHandler } from '../services/assetPool/videoRequests.js';
    import { createKaratahtaAssetSource } from '../services/assetPool/assetSource.js';
+   import { createKaratahtaVideoSource } from '../services/assetPool/videoSource.js';
    import { listPublicCatalogLessons, getPublicLessonVideo } from '../services/supabaseStore.js';
    import { createStorageSignedUrl } from '../services/mediaStore.js';
    import { isYoutubeStoragePath } from '../services/youtubeSource.js';
 
+   const assetPoolToken = String(process.env.ASSET_POOL_TOKEN || '').trim();
+
    export const assetPoolHandler = createAssetPoolHandler({
-     token: process.env.ASSET_POOL_TOKEN,
+     token: assetPoolToken,
      ...createKaratahtaAssetSource({
        store: { listPublicCatalogLessons, getPublicLessonVideo },
        media: { createStorageSignedUrl },
@@ -103,29 +108,70 @@ nothing from the app's source tree. In the app:
        publishUrlTtlSeconds: Number(process.env.SOCIAL_PUBLISH_VIDEO_URL_TTL_SECONDS || 86400)
      })
    });
+
+   // Optional: only mount video-requests if the scheduler secret this
+   // adapter needs to call the app's own /api/generate-lesson is configured.
+   const schedulerToken = String(process.env.SCHEDULER_INTERNAL_TOKEN || '').trim();
+   export const videoRequestHandler = schedulerToken
+     ? createVideoRequestHandler({
+         token: assetPoolToken,
+         ...createKaratahtaVideoSource({
+           backendUrl: process.env.PUBLIC_BASE_URL || `http://127.0.0.1:${process.env.PORT || 3000}`,
+           token: schedulerToken
+         })
+       })
+     : null;
    ```
 
-3. In `server.js`: `import { assetPoolHandler } from './routes/assetPool.js';` and
-   `app.use('/api/assets', assetPoolHandler);` — and, if you also wired
-   `videoRequestHandler`, `app.use('/api/video-requests', videoRequestHandler);`
-4. Set `ASSET_POOL_TOKEN` (any long random string) in the app's environment and
-   put the same value in the agent's `APP_INTERNAL_TOKEN`.
-5. `node asset-pool/bin/check.js https://<your-app> --token "$ASSET_POOL_TOKEN" --prepare --video-requests`
+3. In `server.js`, next to the app's other routers:
+
+   ```js
+   import { assetPoolHandler, videoRequestHandler } from './routes/assetPool.js';
+   // ...
+   app.use(assetPoolHandler);
+   if (videoRequestHandler) app.use(videoRequestHandler);
+   ```
+
+4. `ASSET_POOL_TOKEN` added to `karatahta2/.env.example` next to
+   `SCHEDULER_INTERNAL_TOKEN`/`SCHEDULER_USER_ID` — set it to any long random
+   string in the app's real `.env` and put the same value in the agent's
+   `APP_INTERNAL_TOKEN`.
+5. One fix the wiring surfaced that isn't obvious from Kara Tahta's API alone:
+   `POST /api/generate-lesson` silently ignores `target_video_minutes` unless
+   the request also sets `duration_touched: true` (see
+   `buildTraditionalPlannerRequest` in `server.js`) — `videoSource.js` sends
+   both together.
 
 Nothing in Kara Tahta's auth changes: the pool authenticates with its own token
 (and, for video requests, the app's own scheduler token internally) and never
-touches user sessions.
+touches user sessions. `GET /api/assets`/`GET /api/video-requests` don't
+collide with anything Kara Tahta already serves (checked: no existing route
+under either path).
 
 ## What has and hasn't been verified
 
-`npm test` runs `assetSource.js` against fakes shaped after Kara Tahta's
-`supabaseStore.js`/`mediaStore.js` (lesson rows, `{ signedUrl, expiresAt }`),
-and `videoSource.js` against a fake `/api/generate-lesson` + `/api/jobs/:id`
-backend — both served through the real handlers and the real conformance
-checker, all green (`test/karatahta-video.test.js`, plus the `prepareAsset`
-cases in `test/karatahta.test.js`). Neither has been run against a live Kara
-Tahta instance (that needs its Supabase project, storage bucket, and a real
-scheduler token). One thing to confirm on first run: local-storage
-deployments can produce `http://` signed URLs, which the handler will drop
-(the checker's "every asset matches" line and the `X-Asset-Pool-Dropped`
-header will show it) — set the app's public base URL to `https`.
+`npm test` (in this repo) runs `assetSource.js` and `videoSource.js` against
+fakes shaped after Kara Tahta's real functions, through the real handlers and
+the real conformance checker — all green.
+
+Beyond that, the actual wiring above was exercised against Kara Tahta's real
+code, not just fakes: `node --check` on every copied/new file, a direct
+in-process call of `assetPoolHandler`/`videoRequestHandler` with a fake
+request (wrong token → `401`; right token, no Supabase configured → opaque
+`500`, not a crash; a video-request POST → real `topic`/`duration_touched`
+body built and a real `fetch` attempted at Kara Tahta's own
+`/api/generate-lesson`, failing with a clean `502` since nothing was
+listening), and then the real `karatahta2/server.js` process started end to
+end (`PORT=8877 ASSET_POOL_TOKEN=... node server.js`) and hit over real HTTP
+with `curl` and with `asset-pool/bin/check.js`: auth checks passed, and the
+list check failed exactly as expected (`Supabase ayarlari eksik` — Kara
+Tahta's dev `.env` on this machine has no `SUPABASE_URL`/service key), which
+is the correct "fail closed and say why" behavior, not a wiring bug.
+
+**Not verified**: an actual listing/prepare/generation against a live
+Supabase project and Railway/local storage bucket — that needs real
+credentials this machine doesn't have. One thing to confirm on first run with
+real credentials: local-storage deployments can produce `http://` signed
+URLs, which the handler will drop (the checker's "every asset matches" line
+and the `X-Asset-Pool-Dropped` header will show it) — set the app's public
+base URL to `https`.

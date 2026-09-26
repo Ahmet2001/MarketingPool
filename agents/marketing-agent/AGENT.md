@@ -32,10 +32,21 @@ and this repo is honest about which is which:
 | `execute_publish` | `sosyal_medya_agent`: `worker_video_yayinla`/`worker_instagram_carousel_yayinla`/`worker_yayin_durumu_sorgula` | [`social-media-worker`](../../social-media-worker), which is real and running today |
 
 Two of the five (`execute_publish` and `collect_platform_data`) have a real
-worker on the other end right now. The other three depend on an App this
-repository doesn't contain — every tool for them fails with a clear
-configuration error instead of fabricating data when that App piece isn't
-there (see each section below).
+worker on the other end right now. The other three depend on an App; this
+repository doesn't contain one, but a real App — Kara Tahta, at a sibling
+checkout `../../karatahta2` — has the asset-pool contract actually wired into
+its own `server.js` (`routes/assetPool.js`, see
+[`asset-pool/examples/karatahta/README.md`](../../asset-pool/examples/karatahta/README.md)
+for exactly what was changed and how it was checked). That wiring was
+verified against Kara Tahta's real code — auth, routing, and the
+"fails closed with a clear error" path all confirmed by starting the actual
+server and hitting it with `curl`/`bin/check.js` — but not against a live
+listing, since this dev machine's Kara Tahta `.env` has no Supabase project
+configured yet. Point `APP_INTERNAL_URL`/`APP_INTERNAL_TOKEN` at a Kara Tahta
+instance with `ASSET_POOL_TOKEN` and real Supabase credentials set to make it
+live; until then, or for any other App, every tool for these three fails with
+a clear configuration error instead of fabricating data (see each section
+below).
 
 `social-media-worker`'s `publish_jobs` queue accepts exactly two
 schema-valid actions: `video.publish` and `instagram.carousel`
