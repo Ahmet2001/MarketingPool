@@ -28,7 +28,7 @@ Most marketing work is repeatable: collect data, make an asset, publish it, look
 
 | Folder | What it is |
 | --- | --- |
-| [`agent/`](./agent) | **The marketing agent (Mimar).** An orchestrator LLM that hands work to specialised sub-agents: social media, content creation, asset collection, platform data. It runs as a worker: it polls a job queue and also serves MCP. Talks to OpenAI-compatible model APIs: tested with DeepSeek; Gemini and Kimi/Moonshot are supported in the code. |
+| [`agent/`](./agent) | **The marketing agent (Ethgent).** An orchestrator LLM that hands work to specialised sub-agents: social media, content creation, asset collection, platform data. It runs as a worker: it polls a job queue and also serves MCP. Talks to OpenAI-compatible model APIs: tested with DeepSeek; Gemini and Kimi/Moonshot are supported in the code. |
 | [`marketing-agent-assets/`](./marketing-agent-assets) | **The open pool.** Queue workers (publishing, scheduling, read-only platform data, MCP), official-API toolboxes for X, Instagram, Reddit, YouTube and TikTok, an app-connection kit (`asset-pool`), shared JSON schemas, LLM decision guides (skills) and examples. |
 | [`docker-compose.yml`](./docker-compose.yml) · [`docker/`](./docker) | Runs the agent and the workers together on one machine, with a **local queue** (Postgres + PostgREST) where a hosted Supabase would normally be. |
 | [`manifesto.md`](./manifesto.md) | Why these pieces exist and how they relate. |
@@ -104,10 +104,10 @@ Nothing secret is committed. `.env` and everything in `env/*.env` are git-ignore
 | `env/platform-data-worker.env` | Platform credentials for read-only data, e.g. `YOUTUBE_API_KEY` | Optional until you collect that platform's data. |
 | `env/social-media-worker.env` | Platform credentials for publishing | Optional until you publish. |
 
-**Choosing the model.** The agent talks to OpenAI-compatible APIs. The example file is set up for DeepSeek, the only provider tested here. Two things in the code are easy to trip over:
+**Choosing the model.** The agent talks to OpenAI-compatible APIs. The example file is set up for DeepSeek, the only provider tested here. Two things are easy to trip over:
 
-- For every provider other than `gemini`, the key is read from **`MOONSHOT_API_KEY`** (or `KIMI_API_KEY`). Put your DeepSeek key there; the name is odd, the value is yours.
-- Three inactive sub-agents build a Gemini client at start-up and crash without a value, so keep `GEMINI_API_KEY=unused-placeholder` unless you enable them.
+- For a provider other than `gemini` or `moonshot`, the key is read from `<PROVIDER>_API_KEY`, so `MODEL_PROVIDER=deepseek` uses **`DEEPSEEK_API_KEY`** (or `MODEL_API_KEY` for any provider).
+- Three inactive sub-agents build a Gemini client at start-up and crash without a value (checked again after the last upstream merge), so keep `GEMINI_API_KEY=unused-placeholder` unless you enable them.
 
 More detail, including how the Docker images differ from the sources, is in [`docker/README.md`](./docker/README.md).
 

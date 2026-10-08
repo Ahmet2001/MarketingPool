@@ -16,7 +16,7 @@ docker compose down -v                                       # stop and DELETE t
 | `db`, `postgrest`, `queue` | the local "Supabase". Reachable from this computer at `http://127.0.0.1:54321/rest/v1/` with `SERVICE_KEY` from `.env` | nothing |
 | `platform-data-worker` | read-only platform data collection | platform keys in `env/platform-data-worker.env` |
 | `social-media-worker` | publishes `publish_jobs` | platform credentials in `env/social-media-worker.env` |
-| `agent` | the marketing agent as a worker: polls `agent_jobs`, serves MCP on `127.0.0.1:8091` (bearer token `AGENT_MCP_TOKEN` from `.env`) | `cp env/agent.env.example env/agent.env`, then put your DeepSeek key in `MOONSHOT_API_KEY` (the agent reads that name for every non-Gemini provider). The example is set up for DeepSeek; keep `GEMINI_API_KEY=unused-placeholder`, three inactive sub-agents crash at start without a value |
+| `agent` | the marketing agent as a worker: polls `agent_jobs`, serves MCP on `127.0.0.1:8091` (bearer token `AGENT_MCP_TOKEN` from `.env`) | `cp env/agent.env.example env/agent.env`, then put your DeepSeek key in `DEEPSEEK_API_KEY`. The example is set up for DeepSeek; keep `GEMINI_API_KEY=unused-placeholder`, three inactive sub-agents crash at start without a value |
 | `scheduler-worker`, `mcp-worker` | profile `backend`: drive a backend's content endpoints | `BACKEND_INTERNAL_URL` etc. in `env/*.env` |
 
 `env/<service>.env` files are optional and are never copied into an image.
