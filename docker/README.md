@@ -37,6 +37,25 @@ The agent container (1.9 GB image, Chromium and a virtual screen included) start
 
 Not checked: a real agent run with a real model key, anything that needs the browser or the screen (the agent's browser tools are inactive by default), real publishing (needs real credentials and public https media URLs), and `scheduler-worker` / `mcp-worker` (they need a backend).
 
+## Putting a workflow from the factory to work
+
+The workflow factory ([MarketingStudio](https://github.com/Ahmet2001/MarketingStudio)) turns a workflow into a pack the agent installs. The pack is a folder under [`packs/`](../packs), which the agent container sees read-only at `/packs`.
+
+```bash
+# in MarketingStudio: write and check the workflow, then export it with the agent target
+python -m studio adapt examples/workflows/text_summary.yaml --target agent-bundle \
+       --out ../MarketingPool/packs/text_summary --sources examples/text_summary
+
+# here: install it into the running agent (this also restarts it)
+./docker/install_pack.sh text_summary          # add --overwrite to update an installed pack
+```
+
+Then give the agent a task, e.g. an `agent_jobs` row with `{"task": "text_summary_agent ile bu metnin raporunu cikar. Baslik: Demo. top: 3. Metin: \"...\""}`. Use `agent-bundle`, not `agent-pack`: an installed tool alone is not callable by the orchestrator, it needs a sub-agent that owns it, and `agent-bundle` adds that agent.
+
+Checked end to end with `packs/text_summary` (a deterministic text tool, no keys): the agent app's own preview accepted the pack; after install the orchestrator listed `text_summary_agent` among its active sub-agents; a queued task made it delegate to that agent, which called the tool with correctly typed arguments (`top` as an integer) and returned the report. The answer (17 words; marketing, agents, workers) matched what the engine computes on its own. Tool run folders go to `/data/studio_tools` and the agent's config (`agents.yaml`, `custom_tools.yaml`) lives in `/data/config`, both on a volume, so an installed pack survives the container being recreated (checked with `up --force-recreate`). The first version of this setup kept the config inside the image and lost the pack on recreate. The image's default config is copied to the volume only on first start, so later changes to those defaults do not reach an existing volume.
+
+Not checked: a workflow with a step that writes outside the machine (the approval flag), a workflow with file inputs, and packages or programs the exported engines need (the image has only what the agent needs).
+
 ## Things the agent needed to work here (found by running it)
 
 - `config/agents.yaml` pins the sub-agents to `gemma-4-26b-a4b-it`, which DeepSeek rejects. The agent image rewrites that to `default` (= `SUBMODEL_MODEL_NAME`) at build time; the source file is untouched.

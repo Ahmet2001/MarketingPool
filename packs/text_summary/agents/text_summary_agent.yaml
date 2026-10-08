@@ -1,0 +1,10 @@
+name: text_summary_agent
+type: config
+enabled: true
+description: Counts the words of a text and lists its most frequent words as a short
+  Markdown report. Delegate to this agent to run the `text_summary` workflow.
+model: default
+tool_mode: custom
+tools:
+- text_summary
+system_prompt_file: prompts/text_summary_agent.md

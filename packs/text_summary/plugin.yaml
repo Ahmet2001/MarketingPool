@@ -1,0 +1,14 @@
+name: text_summary
+version: 0.1.0
+type: agent_bundle
+description: Counts the words of a text and lists its most frequent words as a short
+  Markdown report.
+tools:
+- name: text_summary
+  file: tools/text_summary.py
+  description: Counts the words of a text and lists its most frequent words as a short
+    Markdown report.
+  params_note: '{"text": "<text>", "title": "<text>", "top": 5}'
+  env_vars: []
+agents:
+- agents/text_summary_agent.yaml

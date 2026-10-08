@@ -27,6 +27,8 @@ COPY . .
 # config/agents.yaml pins some sub-agents to a Gemma model name that other providers reject. "default" means
 # "use SUBMODEL_MODEL_NAME from the environment". The source file is left as it is; only the image changes.
 RUN sed -i 's/^  model: gemma-4-26b-a4b-it$/  model: default/' MarketingApp/config/agents.yaml
-ENV PYTHONUNBUFFERED=1 ETHGENT_WORKSPACE_DIR=/data/workspace DISPLAY=:99
+ENV PYTHONUNBUFFERED=1 ETHGENT_WORKSPACE_DIR=/data/workspace ETHGENT_CONFIG_DIR=/data/config DISPLAY=:99
+# The config (agents.yaml, custom_tools.yaml, ...) lives on the /data volume so that installed packs survive a
+# container being recreated. The image's defaults are copied in on first start; files already there are kept.
 # xvfb-run hangs here without ever starting Python, so the virtual screen is started by hand.
-CMD ["sh", "-c", "rm -f /tmp/.X99-lock; Xvfb :99 -screen 0 1280x800x24 -nolisten tcp & sleep 2; exec python -m MarketingApp.worker"]
+CMD ["sh", "-c", "mkdir -p /data/config && cp -rn /app/MarketingApp/config/. /data/config/; rm -f /tmp/.X99-lock; Xvfb :99 -screen 0 1280x800x24 -nolisten tcp & sleep 2; exec python -m MarketingApp.worker"]
