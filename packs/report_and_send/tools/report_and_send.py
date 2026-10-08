@@ -53,7 +53,7 @@ def _invoke(values, approve):
             return {
                 "status": "needs_approval",
                 "gated_steps": _GATED,
-                "message": 'This workflow changes something outside the machine (send: outbox.send). Ask the user to confirm first; call again with approve=true only after they said yes.',
+                "message": '',
             }
         root = _home()
         bases = {
@@ -70,7 +70,30 @@ def _invoke(values, approve):
         return {"status": "error", "error": f"{type(error).__name__}: {error}"}
 
 
-def report_and_send(text: str, title: str, to: str, approve: bool = False) -> dict:
+
+import asyncio
+
+_GATE_ACTION = 'report_and_send'
+_GATE_DESCRIPTION = "Run the workflow 'report_and_send'. It changes something outside the machine: send (outbox.send)."
+_NOT_APPROVED = 'Not approved: this workflow changes something outside the machine (send (outbox.send)), and whoever started this job did not approve it (or this agent has no approval gate). Tell the user it needs their approval. Do not try to get around it.'
+
+
+def _host_gate():
+    """The approval gate of the agent app this tool runs in, or None when the host has none."""
+    try:
+        from MarketingApp.environments.approval_runtime import request_tool_approval
+    except Exception:
+        return None
+    return request_tool_approval
+
+
+async def _approved():
+    # The answer comes from the host (a person at its terminal, or whoever queued the job), never from the
+    # model. With no gate the tool refuses: a workflow that writes outside must not run unchecked.
+    gate = _host_gate()
+    return gate is not None and bool(await gate(_GATE_ACTION, _GATE_DESCRIPTION))
+
+async def report_and_send(text: str, title: str, to: str) -> dict:
     """
     Summarises a text into a short report and sends it to a recipient. Sending needs approval.
 
@@ -78,14 +101,18 @@ def report_and_send(text: str, title: str, to: str, approve: bool = False) -> di
         text: The text to summarise.
         title: Title of the report.
         to: Who receives the report.
-        approve: This workflow changes something outside the machine (send: outbox.send). Ask the user to confirm first; call again with approve=true only after they said yes.
+
+    This workflow changes something outside the machine. It runs only if whoever started this job approved it
+    beforehand; you cannot grant that yourself. If it answers 'needs_approval', tell the user and stop.
 
     Returns a dict with status 'ok' and the outputs, 'needs_approval', or 'error'.
     """
-    return _invoke({'text': text, 'title': title, 'to': to}, approve)
+    if not await _approved():
+        return {"status": "needs_approval", "gated_steps": _GATED, "message": _NOT_APPROVED}
+    return await asyncio.to_thread(_invoke, {'text': text, 'title': title, 'to': to}, True)
 
 
 # An agent may compile this file with `from __future__ import annotations` in force, which turns the
 # annotations above into text and makes every parameter look like a string. Pin the real types.
-report_and_send.__annotations__ = {'text': str, 'title': str, 'to': str, 'approve': bool, 'return': dict}
+report_and_send.__annotations__ = {'text': str, 'title': str, 'to': str, 'return': dict}
 

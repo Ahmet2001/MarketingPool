@@ -70,6 +70,7 @@ def _invoke(values, approve):
         return {"status": "error", "error": f"{type(error).__name__}: {error}"}
 
 
+
 def text_summary(text: str, title: str, top: int = 5) -> dict:
     """
     Counts the words of a text and lists its most frequent words as a short Markdown report.

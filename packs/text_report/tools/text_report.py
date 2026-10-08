@@ -70,6 +70,7 @@ def _invoke(values, approve):
         return {"status": "error", "error": f"{type(error).__name__}: {error}"}
 
 
+
 def text_report(source: str, title: str) -> dict:
     """
     Runs 4 step(s): demo.word_count, text.keywords, demo.headline, text.report.
