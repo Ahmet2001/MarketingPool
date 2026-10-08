@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MimarAI Control Room</title>
+    <link rel="stylesheet" href="/panel/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="brand-block">
+                <div class="brand-badge">M</div>
+                <div>
+                    <p class="eyebrow">MarketingApp</p>
+                    <h1>Mimar Control Room</h1>
+                </div>
+            </div>
+
+            <p class="sidebar-copy">
+                Ajan mimarisi, canlı akış ve Agent Studio yönetimi için sade kontrol ekranı.
+            </p>
+
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="dashboard" data-title="Komuta Merkezi">
+                    <span class="nav-icon">◉</span>
+                    <span>Komuta Merkezi</span>
+                </button>
+                <button class="nav-item" data-tab="agent-studio" data-title="Agent Studio">
+                    <span class="nav-icon">◇</span>
+                    <span>Agent Studio</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-status card-surface">
+                <div id="sidebar-system-chip" class="status-chip offline">Offline</div>
+                <strong id="sidebar-model">Model bekleniyor</strong>
+                <span id="sidebar-uptime">Uptime bilgisi henüz yok</span>
+            </div>
+        </aside>
+
+        <div class="stage">
+            <header class="topbar">
+                <div class="topbar-copy-wrap">
+                    <button id="open-env-settings" class="icon-btn topbar-settings-btn" type="button" title="Env ayarlarını düzenle">⚙</button>
+                    <div class="topbar-copy">
+                        <p class="eyebrow">Operations Cockpit</p>
+                        <h2 id="current-tab-title">Komuta Merkezi</h2>
+                        <p id="connection-state" class="connection-state">API bağlantısı hazırlanıyor...</p>
+                    </div>
+                </div>
+
+                <div class="topbar-actions">
+                    <label class="endpoint-control">
+                        <span>API Endpoint</span>
+                        <input id="api-base-input" type="text" placeholder="http://localhost:8001/api">
+                    </label>
+                    <button id="save-api-base" class="btn ghost">Bağlan</button>
+                    <button id="refresh-all" class="btn primary">Yenile</button>
+                </div>
+            </header>
+
+            <main class="panel-stage">
+                <section id="tab-dashboard" class="tab-panel active">
+                    <div class="hero-grid">
+                        <article class="hero-card">
+                            <div class="hero-meta">
+                                <span id="hero-system-pill" class="live-pill offline">Offline</span>
+                                <span id="last-sync-label" class="hero-sync">Henüz senkron yok</span>
+                            </div>
+                            <h3>Çalışan sistemi tek bakışta denetle.</h3>
+                            <p>
+                                Ajan durumu, onay kuyruğu, gecikme grafiği ve canlı log akışı aynı yüzeyde dursun.
+                            </p>
+
+                            <div class="hero-metrics">
+                                <div class="metric-block">
+                                    <span>Model</span>
+                                    <strong id="metric-model">-</strong>
+                                </div>
+                                <div class="metric-block">
+                                    <span>Uptime</span>
+                                    <strong id="metric-uptime">-</strong>
+                                </div>
+                                <div class="metric-block">
+                                    <span>Bekleyen Onay</span>
+                                    <strong id="metric-approvals">0</strong>
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="card-surface summary-card">
+                            <div class="section-heading">
+                                <div>
+                                    <p class="eyebrow">Sistem Özeti</p>
+                                    <h3>Öne Çıkanlar</h3>
+                                </div>
+                            </div>
+                            <div id="summary-grid" class="summary-grid"></div>
+                        </article>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        <article class="card-surface architecture-card">
+                            <div class="section-heading">
+                                <div>
+                                    <p class="eyebrow">Architecture</p>
+                                    <h3>Ajan Hiyerarşisi</h3>
+                                </div>
+                            </div>
+
+                            <div class="architecture-board">
+                                <div class="root-cluster">
+                                    <div class="root-panel">
+                                        <div class="node-head">
+                                            <span class="node-mark">🧠</span>
+                                            <div>
+                                                <h3>BaseModel</h3>
+                                                <p>Merkez orkestratör</p>
+                                            </div>
+                                        </div>
+                                        <div id="basemodel-tools" class="tool-cloud"></div>
+                                    </div>
+                                </div>
+                                <div id="submodels-container" class="agent-grid"></div>
+                            </div>
+                        </article>
+
+                        <article class="card-surface activity-card">
+                            <div class="section-heading">
+                                <div>
+                                    <p class="eyebrow">Activity</p>
+                                    <h3>Canlı Akış</h3>
+                                </div>
+                            </div>
+                            <div class="filter-bar">
+                                <label class="filter-field">
+                                    <span>Tür</span>
+                                    <select id="activity-type-filter">
+                                        <option value="all">Tümü</option>
+                                        <option value="sistem">Sistem</option>
+                                        <option value="tool">Tool</option>
+                                        <option value="submodel">Alt ajan</option>
+                                    </select>
+                                </label>
+                                <label class="filter-field filter-grow">
+                                    <span>Arama</span>
+                                    <input id="activity-search" type="search" placeholder="Log içinde ara...">
+                                </label>
+                            </div>
+                            <div id="live-activity" class="activity-stream"></div>
+                        </article>
+                    </div>
+
+                    <div class="dashboard-grid dashboard-grid-bottom">
+                        <article class="card-surface chart-card">
+                            <div class="section-heading">
+                                <div>
+                                    <p class="eyebrow">Performance</p>
+                                    <h3>Gecikme Eğrisi</h3>
+                                </div>
+                            </div>
+                            <div class="chart-wrap">
+                                <canvas id="stats-chart"></canvas>
+                            </div>
+                        </article>
+
+                        <article class="card-surface approvals-card">
+                            <div class="section-heading">
+                                <div>
+                                    <p class="eyebrow">Approvals</p>
+                                    <h3>Bekleyen Kararlar</h3>
+                                </div>
+                                <span id="approval-count-badge" class="count-badge">0</span>
+                            </div>
+                            <div id="pending-actions-list" class="stack-list empty-copy">
+                                Bekleyen aksiyon bulunmuyor.
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <section id="tab-memory" class="tab-panel" hidden aria-hidden="true">
+                    <div class="memory-layout">
+                        <aside class="memory-side card-surface">
+                            <p class="eyebrow">Memory Modes</p>
+                            <div class="memory-nav">
+                                <button class="mem-nav-item active" data-mem="persona">Persona</button>
+                                <button class="mem-nav-item" data-mem="notlar">Notlar</button>
+                                <button class="mem-nav-item" data-mem="tercihler">Tercihler</button>
+                                <button class="mem-nav-item" data-mem="kisiler">Kişiler</button>
+                                <button class="mem-nav-item" data-mem="gorevler">Görevler</button>
+                            </div>
+                        </aside>
+
+                        <div class="memory-content">
+                            <article id="mem-content-persona" class="memory-pane card-surface active">
+                                <div class="section-heading">
+                                    <div>
+                                        <p class="eyebrow">Persona</p>
+                                        <h3>Rol Düzenleyici</h3>
+                                    </div>
+                                    <button id="save-persona" class="btn primary">Kaydet</button>
+                                </div>
+                                <textarea id="persona-editor" class="editor" placeholder="Persona yükleniyor..."></textarea>
+                            </article>
+
+                            <article id="mem-content-list" class="memory-pane card-surface">
+                                <div class="section-heading section-heading-stack">
+                                    <div>
+                                        <p class="eyebrow">Category</p>
+                                        <h3 id="mem-list-title">Bellek Listesi</h3>
+                                    </div>
+                                    <div class="add-entry-form">
+                                        <input type="text" id="new-mem-key" placeholder="Anahtar">
+                                        <input type="text" id="new-mem-val" placeholder="Değer">
+                                        <button id="btn-add-mem" class="btn primary">Ekle</button>
+                                    </div>
+                                </div>
+                                <div class="table-shell">
+                                    <table class="mem-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Anahtar</th>
+                                                <th>Değer</th>
+                                                <th>İşlem</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="mem-table-body"></tbody>
+                                    </table>
+                                </div>
+                            </article>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-workspace" class="tab-panel" hidden aria-hidden="true">
+                    <div class="workspace-toolbar card-surface">
+                        <div>
+                            <p class="eyebrow">Workspace</p>
+                            <h3>Navigator</h3>
+                        </div>
+                        <label class="toolbar-search">
+                            <span>Dosya Ara</span>
+                            <input id="workspace-search" type="search" placeholder="Dosya ya da klasör adına göre filtrele...">
+                        </label>
+                        <div class="toolbar-actions">
+                            <button id="btn-add-source" class="btn ghost">Kaynak Ekle</button>
+                            <button id="refresh-tree" class="btn primary">Ağacı Yenile</button>
+                        </div>
+                    </div>
+
+                    <div class="workspace-layout">
+                        <article class="card-surface tree-panel">
+                            <div class="section-heading">
+                                <div>
+                                    <p class="eyebrow">Tree</p>
+                                    <h3>Dosya Ağacı</h3>
+                                </div>
+                            </div>
+                            <div id="file-tree" class="tree-container"></div>
+                        </article>
+
+                        <div class="workspace-main">
+                            <article class="card-surface viewer-card">
+                                <div class="section-heading">
+                                    <div>
+                                        <p class="eyebrow">Preview</p>
+                                        <h3 id="current-file-name">Dosya Görüntüleyici</h3>
+                                        <span id="current-file-path" class="micro-copy">Henüz dosya seçilmedi</span>
+                                    </div>
+                                    <button id="copy-file-path" class="btn ghost">Yolu Kopyala</button>
+                                </div>
+                                <pre id="file-viewer" class="code-view">Bir dosya seçin...</pre>
+                            </article>
+
+                            <article class="card-surface console-card">
+                                <div class="section-heading">
+                                    <div>
+                                        <p class="eyebrow">Inspector</p>
+                                        <h3>Dosya İçgörüleri</h3>
+                                    </div>
+                                    <button id="clear-file-search" class="btn ghost">Aramayı Temizle</button>
+                                </div>
+                                <div id="file-insights-grid" class="insights-grid">
+                                    <div class="summary-item tone-slate">
+                                        <span>Uzantı</span>
+                                        <strong id="file-stat-extension">-</strong>
+                                    </div>
+                                    <div class="summary-item tone-teal">
+                                        <span>Satır</span>
+                                        <strong id="file-stat-lines">0</strong>
+                                    </div>
+                                    <div class="summary-item tone-amber">
+                                        <span>Karakter</span>
+                                        <strong id="file-stat-chars">0</strong>
+                                    </div>
+                                    <div class="summary-item tone-rose">
+                                        <span>Kelime</span>
+                                        <strong id="file-stat-words">0</strong>
+                                    </div>
+                                </div>
+                                <label class="filter-field filter-grow file-search-field">
+                                    <span>Dosya İçinde Ara</span>
+                                    <input id="file-search-input" type="search" placeholder="Seçili dosyada metin ara...">
+                                </label>
+                                <div id="file-search-results" class="stack-list insight-results empty-copy">
+                                    Bir dosya seçtiğinizde burada satır bazlı arama sonuçları görünecek.
+                                </div>
+                            </article>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-automation" class="tab-panel" hidden aria-hidden="true">
+                    <div class="automation-grid">
+                        <article class="card-surface social-card">
+                            <div class="section-heading">
+                                <div>
+                                    <p class="eyebrow">Social Inbox</p>
+                                    <h3>X Yorum Operasyon Masası</h3>
+                                </div>
+                                <div class="toolbar-actions">
+                                    <button id="launch-browser-visible" class="btn ghost">Görünür Aç</button>
+                                    <button id="refresh-social" class="btn ghost">Kuyruğu Yenile</button>
+                                    <button id="scan-social" class="btn primary">Aktif Sayfayı Tara</button>
+                                </div>
+                            </div>
+
+                            <div class="social-status-strip">
+                                <div class="status-tile">
+                                    <span>Tarayıcı</span>
+                                    <strong id="social-browser-state">Hazırlanıyor</strong>
+                                    <p id="social-browser-url" class="micro-copy">Canlı oturum bilgisi bekleniyor</p>
+                                    <p id="social-browser-mode" class="micro-copy">Mod bilgisi bekleniyor</p>
+                                </div>
+                                <div class="status-tile">
+                                    <span>Kuyruk</span>
+                                    <strong id="social-queue-count">0 yorum</strong>
+                                    <p id="social-queue-updated" class="micro-copy">Henüz tarama yapılmadı</p>
+                                </div>
+                                <div class="status-tile">
+                                    <span>Seçili Yorum</span>
+                                    <strong id="social-selected-meta">Henüz seçim yok</strong>
+                                    <a id="social-open-link" class="micro-link hidden" href="#" target="_blank" rel="noopener noreferrer">X üzerinde aç</a>
+                                </div>
+                            </div>
+                            <div class="filter-bar filter-bar-social">
+                                <label class="filter-field">
+                                    <span>Durum</span>
+                                    <select id="social-queue-filter">
+                                        <option value="actionable">Aksiyonluk</option>
+                                        <option value="all">Tümü</option>
+                                        <option value="new">Yeni</option>
+                                        <option value="drafted">Taslak</option>
+                                        <option value="pending_verify">Doğrulanıyor</option>
+                                        <option value="sent">Gönderildi</option>
+                                        <option value="skipped">Geçildi</option>
+                                        <option value="error">Hata</option>
+                                    </select>
+                                </label>
+                                <label class="filter-field filter-grow">
+                                    <span>Arama</span>
+                                    <input id="social-queue-search" type="search" placeholder="Kullanıcı veya yorum metnine göre filtrele...">
+                                </label>
+                            </div>
+
+                            <div class="social-layout">
+                                <div class="social-queue-pane">
+                                    <div class="section-heading section-heading-compact">
+                                        <div>
+                                            <p class="eyebrow">Queue</p>
+                                            <h3>Bekleyen Yorumlar</h3>
+                                        </div>
+                                    </div>
+                                    <div id="social-queue-list" class="social-queue-list empty-copy">Henüz yorum kuyruğu yok.</div>
+                                </div>
+
+                                <div class="social-editor-pane">
+                                    <div class="section-heading section-heading-stack">
+                                        <div>
+                                            <p class="eyebrow">Reply Studio</p>
+                                            <h3 id="social-editor-title">Yorum seçin</h3>
+                                            <p id="social-comment-preview" class="modal-copy">Tarayıcı açıkken ilgili X sayfasını tarayarak yorumları sıraya alabilirsiniz.</p>
+                                        </div>
+                                        <div class="toolbar-actions">
+                                            <button id="social-generate-draft" class="btn ghost">Taslak Üret</button>
+                                            <button id="social-save-draft" class="btn ghost">Taslağı Kaydet</button>
+                                            <button id="social-skip-item" class="btn ghost">Geç</button>
+                                            <button id="social-send-reply" class="btn primary">Gönder</button>
+                                        </div>
+                                    </div>
+                                    <div class="reply-toolbar">
+                                        <label class="filter-field">
+                                            <span>Taslak Tonu</span>
+                                            <select id="social-tone-select">
+                                                <option value="samimi, kısa ve doğal">Samimi ve doğal</option>
+                                                <option value="bilgilendirici ve net">Bilgilendirici</option>
+                                                <option value="daha enerjik ama kısa">Daha enerjik</option>
+                                                <option value="sakin, profesyonel ve kısa">Profesyonel kısa</option>
+                                            </select>
+                                        </label>
+                                        <div id="social-reply-count" class="counter-pill">0 / 240</div>
+                                    </div>
+                                    <textarea id="social-reply-editor" class="editor compact social-reply-editor" placeholder="Seçili yoruma verilecek cevap burada düzenlenir..."></textarea>
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="card-surface skills-card">
+                            <div class="section-heading">
+                                <div>
+                                    <p class="eyebrow">Runtime Modules</p>
+                                    <h3>Skill Yönetimi</h3>
+                                </div>
+                                <button id="reload-skills" class="btn ghost">Yeniden Yükle</button>
+                            </div>
+                            <div id="skills-list" class="stack-list empty-copy">Skill verisi yükleniyor...</div>
+                        </article>
+
+                        <article class="card-surface heartbeat-card">
+                            <div class="section-heading">
+                                <div>
+                                    <p class="eyebrow">Heartbeat</p>
+                                    <h3>Scheduler Dashboard</h3>
+                                </div>
+                                <div class="toolbar-actions">
+                                    <button id="heartbeat-enable" class="btn ghost">Aç</button>
+                                    <button id="heartbeat-disable" class="btn ghost">Kapat</button>
+                                    <button id="heartbeat-reload" class="btn ghost">Yenile</button>
+                                    <button id="save-heartbeat" class="btn primary">Kaydet</button>
+                                </div>
+                            </div>
+                            <div class="social-status-strip heartbeat-status-strip">
+                                <div class="status-tile">
+                                    <span>Durum</span>
+                                    <strong id="heartbeat-enabled-state">Hazırlanıyor</strong>
+                                    <p id="heartbeat-meta" class="micro-copy">Config okunuyor</p>
+                                </div>
+                                <div class="status-tile">
+                                    <span>Runtime</span>
+                                    <strong id="heartbeat-running-state">Hazırlanıyor</strong>
+                                    <p id="heartbeat-running-meta" class="micro-copy">Scheduler bekliyor</p>
+                                </div>
+                                <div class="status-tile">
+                                    <span>Config Sağlığı</span>
+                                    <strong id="heartbeat-config-state">Kontrol ediliyor</strong>
+                                    <p id="heartbeat-config-meta" class="micro-copy">YAML henüz doğrulanmadı</p>
+                                </div>
+                            </div>
+                            <div id="heartbeat-summary-grid" class="heartbeat-summary-grid"></div>
+                            <div class="filter-bar">
+                                <label class="filter-field">
+                                    <span>Gösterim</span>
+                                    <select id="heartbeat-job-filter">
+                                        <option value="all">Tüm görevler</option>
+                                        <option value="active">Aktif / çalışan</option>
+                                        <option value="issues">Sorunlu / durdurulmuş</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="heartbeat-layout">
+                                <div class="heartbeat-editor-pane">
+                                    <p class="eyebrow">Raw Config</p>
+                                    <textarea id="heartbeat-editor" class="editor" placeholder="Heartbeat config yükleniyor..."></textarea>
+                                </div>
+                                <div class="heartbeat-jobs-pane">
+                                    <div class="section-heading section-heading-stack section-heading-compact">
+                                        <div>
+                                            <p class="eyebrow">Job Yönetimi</p>
+                                            <h3>Görevler</h3>
+                                            <p class="micro-copy">Pause, resume ve run-now işlemleri buradan yönetilir.</p>
+                                        </div>
+                                    </div>
+                                    <div id="heartbeat-job-list" class="stack-list heartbeat-job-list">Job verisi yükleniyor...</div>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <section id="tab-agent-studio" class="tab-panel">
+                    <div class="agent-studio-toolbar card-surface">
+                        <div class="agent-studio-toolbar-main">
+                            <div>
+                                <p class="eyebrow">Agent Studio</p>
+                                <h3>Kodsuz Subagent Builder</h3>
+                                <p class="sidebar-copy">Registry, agent formu ve custom tool çalışma alanı aynı sayfada düzenlenir.</p>
+                            </div>
+                            <div class="agent-studio-overview">
+                                <div class="studio-stat">
+                                    <span>Toplam Agent</span>
+                                    <strong id="agent-studio-agent-count">0</strong>
+                                </div>
+                                <div class="studio-stat">
+                                    <span>Aktif</span>
+                                    <strong id="agent-studio-active-count">0</strong>
+                                </div>
+                                <div class="studio-stat">
+                                    <span>Custom Tool</span>
+                                    <strong id="agent-studio-custom-count">0</strong>
+                                </div>
+                                <div class="studio-stat">
+                                    <span>Hata</span>
+                                    <strong id="agent-studio-error-count">0</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="toolbar-actions agent-studio-actions">
+                            <button id="agent-studio-refresh" class="btn ghost">Kataloğu Yenile</button>
+                            <button id="agent-studio-new-agent" class="btn ghost">Yeni Agent</button>
+                            <button id="agent-studio-reload-runtime" class="btn primary">Runtime Reload</button>
+                        </div>
+                    </div>
+
+                    <div class="agent-studio-grid">
+                        <article class="card-surface agent-studio-list-card">
+                            <div class="section-heading">
+                                <div>
+                                    <p class="eyebrow">Agents</p>
+                                    <h3>Config Registry</h3>
+                                    <p class="micro-copy">Seçili agent solda değil burada tutulur; düzenleme sağ panoda yapılır.</p>
+                                </div>
+                            </div>
+                            <div id="agent-studio-agent-list" class="stack-list empty-copy">Agent kataloğu yükleniyor...</div>
+                            <div id="agent-studio-errors" class="studio-errors"></div>
+
+                            <section class="studio-section">
+                                <div class="studio-section-head">
+                                    <div>
+                                        <p class="eyebrow">Import Pack</p>
+                                        <h4>Tak-Çalıştır Bundle</h4>
+                                    </div>
+                                    <p class="micro-copy">Yerel bir `plugin.yaml` paketini önce preview et, sonra orkestrasyona bağla.</p>
+                                </div>
+                                <div id="agent-studio-pack-list" class="stack-list compact-list empty-copy">Henüz yüklü pack yok.</div>
+                                <label class="filter-field">
+                                    <span>Pack Klasör Yolu</span>
+                                    <input id="agent-studio-pack-path" type="text" placeholder="ornek: MarketingApp/workspace/agent_packs/ornek_pack">
+                                </label>
+                                <div class="studio-form-grid studio-form-grid-tight">
+                                    <label class="toggle-row">
+                                        <input id="agent-studio-pack-overwrite" type="checkbox">
+                                        <span>Var olan kayıtları güncelle</span>
+                                    </label>
+                                    <div class="toolbar-actions studio-inline-actions">
+                                        <button id="agent-studio-pack-preview-btn" class="btn ghost" type="button">Preview</button>
+                                        <button id="agent-studio-pack-install-btn" class="btn primary" type="button">Install</button>
+                                    </div>
+                                </div>
+                                <div id="agent-studio-pack-preview" class="studio-preview empty-copy">Pack önizlemesi burada görünecek.</div>
+                            </section>
+                        </article>
+
+                        <article class="card-surface agent-studio-editor-card">
+                            <div class="section-heading">
+                                <div>
+                                    <p class="eyebrow">Agent Definition</p>
+                                    <h3>Agent Formu</h3>
+                                </div>
+                                <div class="toolbar-actions">
+                                    <button id="agent-studio-delete-agent" class="btn danger">Sil</button>
+                                    <button id="agent-studio-save-agent" class="btn primary">Kaydet</button>
+                                </div>
+                            </div>
+                            <div class="studio-pane-copy">Önce kimliği ve model davranışını tanımla, sonra prompt ve tool setini bağla.</div>
+
+                            <section class="studio-section">
+                                <div class="studio-section-head">
+                                    <div>
+                                        <p class="eyebrow">Identity</p>
+                                        <h4>Kimlik ve Çalışma Modu</h4>
+                                    </div>
+                                    <p class="micro-copy">Registry adı, agent tipi ve aktiflik durumu.</p>
+                                </div>
+                                <div class="studio-form-grid">
+                                    <label class="filter-field">
+                                        <span>Ad</span>
+                                        <input id="agent-studio-name" type="text" placeholder="ornek_agent">
+                                    </label>
+                                    <label class="filter-field">
+                                        <span>Tip</span>
+                                        <select id="agent-studio-type">
+                                            <option value="config">Config</option>
+                                            <option value="builtin">Builtin Python Scaffold</option>
+                                        </select>
+                                    </label>
+                                    <label class="filter-field">
+                                        <span>Model Modu</span>
+                                        <select id="agent-studio-model-mode">
+                                            <option value="default">Subagent Default</option>
+                                            <option value="browser_default">Browser Default</option>
+                                            <option value="custom">Custom Model</option>
+                                        </select>
+                                    </label>
+                                    <label class="toggle-row">
+                                        <input id="agent-studio-enabled" type="checkbox">
+                                        <span>Aktif</span>
+                                    </label>
+                                </div>
+                                <label class="filter-field">
+                                    <span>Custom Model</span>
+                                    <input id="agent-studio-model" type="text" placeholder="ornek: gemini-3.1-flash-lite-preview">
+                                </label>
+                                <p id="agent-studio-model-hint" class="micro-copy">Varsayilan model modu secili.</p>
+                                <label class="filter-field">
+                                    <span>Açıklama</span>
+                                    <input id="agent-studio-description" type="text" placeholder="Bu agent ne zaman kullanılmalı?">
+                                </label>
+                            </section>
+
+                            <section class="studio-section">
+                                <div class="studio-section-head">
+                                    <div>
+                                        <p class="eyebrow">Prompt</p>
+                                        <h4>Sistem Davranışı</h4>
+                                    </div>
+                                    <p class="micro-copy">Rol, karar kuralları ve operasyon sınırları burada tanımlanır.</p>
+                                </div>
+                                <label class="filter-field">
+                                    <span>System Prompt</span>
+                                    <textarea id="agent-studio-prompt" class="editor compact" placeholder="Agent rolünü ve çalışma kurallarını yaz..."></textarea>
+                                </label>
+                            </section>
+
+                            <section class="studio-section">
+                                <div class="tool-selector-head">
+                                    <div>
+                                        <p class="eyebrow">Tools</p>
+                                        <h4>Bağlı Tool Kataloğu</h4>
+                                    </div>
+                                    <label class="filter-field tool-search-field">
+                                        <span>Filtre</span>
+                                        <input id="agent-studio-tool-search" type="search" placeholder="Tool ara...">
+                                    </label>
+                                </div>
+                                <div id="agent-studio-tool-list" class="tool-check-grid"></div>
+                            </section>
+                        </article>
+
+                        <article class="card-surface custom-tool-card">
+                            <div class="section-heading">
+                                <div>
+                                    <p class="eyebrow">Custom Tools</p>
+                                    <h3>Trusted Python Tool</h3>
+                                    <p class="micro-copy">Hazır registry ve AI destekli tool üretimi tek çalışma alanında durur.</p>
+                                </div>
+                                <div class="toolbar-actions">
+                                    <button id="custom-tool-new" class="btn ghost">Yeni Tool</button>
+                                    <button id="custom-tool-save" class="btn primary">Kaydet</button>
+                                </div>
+                            </div>
+                            <section class="studio-section">
+                                <div class="studio-section-head">
+                                    <div>
+                                        <p class="eyebrow">Registry</p>
+                                        <h4>Kayıtlı Custom Tool'lar</h4>
+                                    </div>
+                                    <p class="micro-copy">Seç, düzenle veya yeni bir başlangıç oluştur.</p>
+                                </div>
+                                <div id="custom-tool-list" class="stack-list compact-list empty-copy">Custom tool yok.</div>
+                            </section>
+
+                            <section class="studio-section">
+                                <div class="source-tabs custom-tool-tabs">
+                                    <button class="src-tab active custom-tool-tab" data-custom-tab="ai">AI Brief</button>
+                                    <button class="src-tab custom-tool-tab" data-custom-tab="definition">Tanım</button>
+                                    <button class="src-tab custom-tool-tab" data-custom-tab="test">Test</button>
+                                </div>
+                            </section>
+
+                            <section class="studio-section custom-tool-pane active" id="custom-tool-pane-ai">
+                                <div class="studio-section-head">
+                                    <div>
+                                        <p class="eyebrow">AI Assist</p>
+                                        <h4>Brief ile Taslak Üret</h4>
+                                    </div>
+                                    <p class="micro-copy">İstenen tool davranışını anlat; form alanları güvenli taslakla dolsun.</p>
+                                </div>
+                                <div class="custom-ai-box">
+                                    <label class="filter-field">
+                                        <span>AI Brief</span>
+                                        <textarea id="custom-tool-ai-brief" class="editor compact" placeholder="Örn: Verilen URL listesindeki domainleri sayan ve en çok tekrar eden domainleri döndüren bir tool oluştur."></textarea>
+                                    </label>
+                                    <button id="custom-tool-ai-generate" class="btn ghost full-width" type="button">AI ile Tool Oluştur</button>
+                                </div>
+                                <div id="custom-tool-ai-conversation" class="ai-conversation empty-copy">AI brief sohbeti burada görünecek.</div>
+                            </section>
+
+                            <section class="studio-section custom-tool-pane" id="custom-tool-pane-definition">
+                                <div class="studio-section-head">
+                                    <div>
+                                        <p class="eyebrow">Definition</p>
+                                        <h4>Tool Tanımı ve Kod</h4>
+                                    </div>
+                                    <p class="micro-copy">Env, parametre notu, kod gövdesi ve test çıktısı aynı bağlamda dursun.</p>
+                                </div>
+                                <div class="studio-form-grid">
+                                    <label class="filter-field">
+                                        <span>Tool Adı</span>
+                                        <input id="custom-tool-name" type="text" placeholder="ornek_tool">
+                                    </label>
+                                    <label class="toggle-row">
+                                        <input id="custom-tool-enabled" type="checkbox">
+                                        <span>Aktif</span>
+                                    </label>
+                                </div>
+                                <label class="filter-field">
+                                    <span>Açıklama</span>
+                                    <input id="custom-tool-description" type="text" placeholder="Tool ne döndürür?">
+                                </label>
+                                <label class="filter-field">
+                                    <span>Parametre Notu</span>
+                                    <input id="custom-tool-params-note" type="text" placeholder='Örn: {"text": "merhaba"}'>
+                                </label>
+                                <label class="filter-field">
+                                    <span>.env.model Değişkenleri JSON</span>
+                                    <textarea id="custom-tool-env-vars" class="editor compact" spellcheck="false" placeholder='{"NEWS_API_KEY": "buraya_key"}'></textarea>
+                                </label>
+                                <textarea id="custom-tool-code" class="editor custom-tool-code" spellcheck="false">def ornek_tool(text: str) -> str:
+    return text.upper()
+</textarea>
+                            </section>
+
+                            <section class="studio-section custom-tool-pane" id="custom-tool-pane-test">
+                                <div class="studio-section-head">
+                                    <div>
+                                        <p class="eyebrow">Validation</p>
+                                        <h4>Tool Test Alanı</h4>
+                                    </div>
+                                    <p class="micro-copy">Örnek argümanla tool davranışını kaydetmeden veya kaydettikten sonra kontrol et.</p>
+                                </div>
+                                <div class="custom-test-grid">
+                                    <label class="filter-field">
+                                        <span>Test Argümanı JSON</span>
+                                        <textarea id="custom-tool-test-args" class="editor compact" spellcheck="false">{}</textarea>
+                                    </label>
+                                    <div>
+                                        <button id="custom-tool-test" class="btn ghost full-width">Test Et</button>
+                                        <pre id="custom-tool-test-result" class="code-view custom-test-result">Test çıktısı bekleniyor...</pre>
+                                    </div>
+                                </div>
+                            </section>
+                        </article>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <button id="approval-badge" class="approval-badge hidden">Onay Bekleniyor</button>
+    <div id="toast-region" class="toast-region"></div>
+
+    <div id="approval-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <p class="eyebrow">Approval Required</p>
+                    <h3>İşlem Onayı</h3>
+                </div>
+            </div>
+            <p id="approval-desc" class="modal-copy">Onay bekleyen işlem açıklaması burada görünecek.</p>
+            <div class="modal-actions">
+                <button id="btn-reject" class="btn danger">Reddet</button>
+                <button id="btn-approve" class="btn primary">Onayla</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="source-modal" class="modal hidden">
+        <div class="modal-content source-modal">
+            <div class="modal-header">
+                <div>
+                    <p class="eyebrow">Target Intake</p>
+                    <h3>Yeni Kaynak Ekle</h3>
+                </div>
+                <button id="close-source-modal" class="icon-btn" type="button">×</button>
+            </div>
+
+            <div class="source-tabs">
+                <button class="src-tab active" data-src="file">Dosya</button>
+                <button class="src-tab" data-src="url">URL</button>
+                <button class="src-tab" data-src="text">Metin</button>
+            </div>
+
+            <div id="src-content-file" class="src-sub-content active">
+                <div id="drop-zone" class="upload-zone">
+                    <span>Dosyayı sürükleyin ya da seçin</span>
+                    <input type="file" id="file-input" hidden>
+                </div>
+                <div id="selected-file-name" class="micro-copy">Seçili dosya yok</div>
+                <button id="btn-upload" class="btn primary full-width">Yükle</button>
+            </div>
+
+            <div id="src-content-url" class="src-sub-content">
+                <input id="src-url-name" type="text" placeholder="Kaynak adı">
+                <input id="src-url-val" type="url" placeholder="https://example.com">
+                <button id="btn-add-url" class="btn primary full-width">URL Ekle</button>
+            </div>
+
+            <div id="src-content-text" class="src-sub-content">
+                <input id="src-text-name" type="text" placeholder="Kaynak adı">
+                <textarea id="src-text-val" class="editor compact" placeholder="Metni buraya ekleyin..."></textarea>
+                <button id="btn-add-text" class="btn primary full-width">Metin Ekle</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="env-modal" class="modal hidden">
+        <div class="modal-content env-modal-content">
+            <div class="modal-header">
+                <div>
+                    <p class="eyebrow">Runtime Settings</p>
+                    <h3>Env Düzenleyici</h3>
+                    <p class="modal-copy">`.env` ve `.env.local` içeriklerini düzenleyebilirsin. Bazı değişiklikler için uygulamayı yeniden başlatmak gerekebilir.</p>
+                </div>
+                <button id="close-env-modal" class="icon-btn" type="button">×</button>
+            </div>
+
+            <div class="env-toolbar">
+                <label class="filter-field env-target-field">
+                    <span>Dosya</span>
+                    <select id="env-target-select">
+                        <option value=".env">.env</option>
+                        <option value=".env.local">.env.local</option>
+                        <option value=".env.model">.env.model</option>
+                    </select>
+                </label>
+                <div id="env-file-meta" class="micro-copy">Dosya bilgisi yükleniyor...</div>
+            </div>
+
+            <textarea id="env-editor" class="editor env-editor" placeholder="KEY=value"></textarea>
+
+            <div class="modal-actions">
+                <button id="reload-env-content" class="btn ghost" type="button">Yeniden Yükle</button>
+                <button id="save-env-content" class="btn primary" type="button">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/panel/script.js"></script>
+</body>
+</html>

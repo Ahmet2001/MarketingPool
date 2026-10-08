@@ -1,0 +1,6 @@
+agent: all
+description: YouTube uzerinde arama, kanal/video inceleme ve etkileşim akislarina dair operasyon rehberi verir
+enabled: true
+function: youtube_kullanim_rehberi
+module: MarketingApp.araclar.skills.youtube_kullanim_rehberi
+name: youtube_kullanim_rehberi

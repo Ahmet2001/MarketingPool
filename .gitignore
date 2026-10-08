@@ -1,0 +1,20 @@
+# Secrets: the local queue's keys and your model/platform keys. Only the *.example files are committed.
+.env
+.env.*
+env/*.env
+!env/*.example
+!.env.example
+
+# Not part of this repository
+ideogram (Kopya)/
+agents-README.md
+
+# Local state
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+workspace/
+*.sqlite
+*.sqlite-*

@@ -1,0 +1,6 @@
+agent: all
+description: X uzerinde post, reply, bildirim ve browser fallback akislarina dair operasyon rehberi verir
+enabled: true
+function: x_kullanim_rehberi
+module: MarketingApp.araclar.skills.x_kullanim_rehberi
+name: x_kullanim_rehberi
