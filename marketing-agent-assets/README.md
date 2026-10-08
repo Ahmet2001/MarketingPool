@@ -3,9 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Architecture](https://img.shields.io/badge/architecture-app%20%E2%86%94%20worker%20%E2%86%94%20agent-6f42c1)](./future_work.md)
 
-Open-source building blocks for marketing systems that need to turn approved content into channel-ready assets and publish them safely. Use the deployable worker, platform toolboxes, LLM skills, and shared schemas independently—or combine them as the foundation for a marketing agent.
+Open-source building blocks for marketing systems that need to turn approved content into channel-ready assets and publish them safely. Use the deployable worker, platform toolboxes, LLM skills, and shared schemas independently—or combine them as the foundation for a marketing agent. It is also meant to grow in the open: anyone can add a platform, an action, a skill, or a connection to their own app (see [Open contribution](#open-contribution)).
 
-> Status: the worker, toolbox, schema, example, and skill layers are available. A first `agents/marketing-agent` is wired to the worker's `publish_jobs` queue for its two supported actions (`video.publish`, `instagram.carousel`), with an approval gate and idempotency keys in front of it. All five items in `future_work.md`'s planned worker capability surface now have an agent-side implementation: [`asset-pool/`](./asset-pool) is a contract + kit any app can implement for `collect_assets` (required) and the optional `prepare_media`/`request_video_generation` — a real app (Kara Tahta, sibling checkout, not in this repo) now has it wired into its own server, verified by starting that server and hitting it over HTTP, see [`asset-pool/examples/karatahta/README.md`](./asset-pool/examples/karatahta/README.md); [`platform_data_worker/`](./platform_data_worker) is a real, standalone worker (not a stub) for `collect_platform_data`, enforcing a per-platform read-only allowlist declared in each `toolboxes/*/manifest.yaml`. See [`agents/marketing-agent/AGENT.md`](./agents/marketing-agent/AGENT.md) for exactly what's real versus what still needs live credentials on the other end.
+> Status: the worker, toolbox, schema, example, and skill layers are available. A first `agent` is wired to the worker's `publish_jobs` queue for its two supported actions (`video.publish`, `instagram.carousel`), with an approval gate and idempotency keys in front of it. All five items in `future_work.md`'s planned worker capability surface now have an agent-side implementation: [`asset-pool/`](./asset-pool) is a contract + kit any app can implement for `collect_assets` (required) and the optional `prepare_media`/`request_video_generation` — a real app (Kara Tahta, sibling checkout, not in this repo) now has it wired into its own server, verified by starting that server and hitting it over HTTP, see [`asset-pool/examples/karatahta/README.md`](./asset-pool/examples/karatahta/README.md); [`platform_data_worker/`](./platform_data_worker) is a real, standalone worker (not a stub) for `collect_platform_data`, enforcing a per-platform read-only allowlist declared in each `toolboxes/*/manifest.yaml`. See [`agent/AGENT.md`](../agent/AGENT.md) for exactly what's real versus what still needs live credentials on the other end.
 
 ## Why this exists
 
@@ -21,12 +21,34 @@ App ⇄ Social-media worker environment ⇄ Marketing agent
 
 Read the [future architecture and delivery plan](./future_work.md) for the responsibility map, security boundaries, and agent roadmap.
 
+## Open contribution
+
+The workers are the part that runs, but they are not the whole point. A main idea of this project is an **open pool**: a place where people add and share marketing capabilities, so nobody has to rebuild the same platform integration, decision guide or app connection alone.
+
+Most of what is here is declarative on purpose, so you can contribute without touching any worker:
+
+| You want to add | Where it goes | What makes it a good contribution |
+| --- | --- | --- |
+| A platform, or an action on one | [`toolboxes/<platform>/`](./toolboxes) and its `manifest.yaml` | Declare the action in the manifest before exposing it. Mark it `api` or `browser`. Say which OAuth scopes and environment variables it needs, its rate limits, and whether it writes external state. |
+| A read-only data action for the agent | `data_collection.actions` in the toolbox manifest | A `get_`, `search_` or `list_` function with typed, bounded parameters. Anything not listed there stays refused by [`platform_data_worker/`](./platform_data_worker). |
+| A decision guide for the LLM | [`skills/<name>/SKILL.md`](./skills) | A guide for deciding, not executing: when to use it, what to check, what to refuse. |
+| A shared contract | [`schemas/`](./schemas) | Keep existing schemas intact. A breaking change is a new schema version. |
+| A connection to **your own app** | [`asset-pool/`](./asset-pool) | Implement the small endpoint contract and prove it with the included conformance checker. The pool is not tied to one app: Kara Tahta is only a worked example. |
+| A queue other than Supabase | A module for the worker's `QUEUE_ADAPTER_MODULE` | Export `claimNextJob`, `finishJob` and `failJob`. |
+| A worked example | [`examples/`](./examples) | Small, portable, no secrets. |
+
+What every contribution has to respect (details in [CONTRIBUTING.md](./CONTRIBUTING.md)):
+
+- Anything that publishes, replies, follows, votes or otherwise affects a third-party account needs application-level authorization at call time.
+- No secrets, browser profiles, tokens, downloaded media or user data.
+- Capabilities stay independent of any single app, so others can reuse them as they are.
+
 ## What is included
 
 | Area | What it provides |
 | --- | --- |
 | [`social-media-worker/`](./social-media-worker) | Node.js queue worker for video publishing and Instagram carousels. |
-| [`agents/marketing-agent/`](./agents/marketing-agent) | Tool-calling LLM orchestrator that creates content and queues schema-valid publish jobs onto the worker. See its [`AGENT.md`](./agents/marketing-agent/AGENT.md). |
+| [`agent/`](../agent) | Tool-calling LLM orchestrator that creates content and queues schema-valid publish jobs onto the worker. See its [`AGENT.md`](../agent/AGENT.md). |
 | [`asset-pool/`](./asset-pool) | Dependency-free kit + conformance checker for exposing **your own app's** approved media, media preparation, and video-generation endpoints to the agent. Kara Tahta is included only as a worked example. |
 | [`platform_data_worker/`](./platform_data_worker) | Standalone worker that holds platform credentials and answers read-only data requests from the agent, checked against a manifest allowlist. |
 | [`toolboxes/`](./toolboxes) | Official-API and supervised-browser capabilities for X, Instagram, Reddit, YouTube, and TikTok. Each API toolbox also declares its `data_collection` read-only allowlist for `platform_data_worker`. |
@@ -113,7 +135,7 @@ It must not become an autonomous strategy or engagement engine. See [future_work
 
 ## Contributing
 
-Contributions are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a change. In particular, classify actions as API or browser, document OAuth and rate-limit implications, and never commit secrets or user data.
+Contributions are welcome, and they are a core part of the project, not an afterthought: see [Open contribution](#open-contribution) for what you can add. Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a change. In particular, classify actions as API or browser, document OAuth and rate-limit implications, and never commit secrets or user data.
 
 ## License and source notice
 

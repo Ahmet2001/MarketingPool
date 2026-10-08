@@ -1,7 +1,7 @@
 # Platform Data Worker
 
 A standalone worker that holds platform credentials (YouTube, Instagram,
-TikTok, X, Reddit) so `agents/marketing-agent` never has to: it claims
+TikTok, X, Reddit) so `agent` never has to: it claims
 `{platform, action, params}` requests from a Supabase queue, checks each one
 against a **manifest allowlist**, runs the one approved, read-only toolbox
 function that matches, and writes a normalized result back. This is the
@@ -45,7 +45,7 @@ pip install -r requirements.txt
 ```
 
 Apply [`migrations/001_platform_data_jobs.sql`](./migrations/001_platform_data_jobs.sql)
-to the same Supabase project `social-media-worker`/`agents/marketing-agent`
+to the same Supabase project `social-media-worker`/`agent`
 use (same `SUPABASE_URL`/`SUPABASE_SECRET_KEY`), configure credentials only
 for the platforms you're collecting from, then:
 

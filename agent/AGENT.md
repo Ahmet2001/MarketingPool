@@ -3,7 +3,7 @@
 An OpenAI-compatible, tool-calling orchestrator (`BaseModel`) that delegates
 content-creation, research, and social-operations work to specialized
 sub-agents. This is the `agents/marketing-agent` referenced in the repo
-root's [`future_work.md`](../../future_work.md) roadmap (Phase 2).
+root's [`future_work.md`](../marketing-agent-assets/future_work.md) roadmap (Phase 2).
 
 ## Where this sits in the App ⇄ Worker ⇄ Agent split
 
@@ -25,18 +25,18 @@ and this repo is honest about which is which:
 
 | Capability | Agent side | Needs from the App / a worker |
 | --- | --- | --- |
-| `collect_assets` | `asset_collector_agent`: `app_asset_listele`/`app_asset_detay` | An [asset-pool](../../asset-pool)-shaped `GET /api/assets` — build your own or use the kit |
+| `collect_assets` | `asset_collector_agent`: `app_asset_listele`/`app_asset_detay` | An [asset-pool](../marketing-agent-assets/asset-pool)-shaped `GET /api/assets` — build your own or use the kit |
 | `prepare_media` | `asset_collector_agent`: `medya_dogrula`/`medya_hazirla` | Optional `POST {id}/prepare`; without it, the listed asset is validated as-is |
 | `request_video_generation` | `asset_collector_agent`: `video_uretimi_iste`/`video_uretimi_durumu` | Optional `POST /api/video-requests`; without it, the tool returns a clear "not implemented" error |
-| `collect_platform_data` | `platform_data_agent`: `platform_veri_*` | The standalone [`platform_data_worker`](../../platform_data_worker) — a real, runnable worker, not a stub |
-| `execute_publish` | `sosyal_medya_agent`: `worker_video_yayinla`/`worker_instagram_carousel_yayinla`/`worker_yayin_durumu_sorgula` | [`social-media-worker`](../../social-media-worker), which is real and running today |
+| `collect_platform_data` | `platform_data_agent`: `platform_veri_*` | The standalone [`platform_data_worker`](../marketing-agent-assets/platform_data_worker) — a real, runnable worker, not a stub |
+| `execute_publish` | `sosyal_medya_agent`: `worker_video_yayinla`/`worker_instagram_carousel_yayinla`/`worker_yayin_durumu_sorgula` | [`social-media-worker`](../marketing-agent-assets/social-media-worker), which is real and running today |
 
 Two of the five (`execute_publish` and `collect_platform_data`) have a real
 worker on the other end right now. The other three depend on an App; this
 repository doesn't contain one, but a real App — Kara Tahta, at a sibling
 checkout `../../karatahta2` — has the asset-pool contract actually wired into
 its own `server.js` (`routes/assetPool.js`, see
-[`asset-pool/examples/karatahta/README.md`](../../asset-pool/examples/karatahta/README.md)
+[`asset-pool/examples/karatahta/README.md`](../marketing-agent-assets/asset-pool/examples/karatahta/README.md)
 for exactly what was changed and how it was checked). That wiring was
 verified against Kara Tahta's real code — auth, routing, and the
 "fails closed with a clear error" path all confirmed by starting the actual
@@ -50,7 +50,7 @@ below).
 
 `social-media-worker`'s `publish_jobs` queue accepts exactly two
 schema-valid actions: `video.publish` and `instagram.carousel`
-(see [`schemas/publish_request.schema.json`](../../schemas/publish_request.schema.json)).
+(see [`schemas/publish_request.schema.json`](../marketing-agent-assets/schemas/publish_request.schema.json)).
 
 `MarketingApp/araclar/worker_yayinlama_araclari.py` adds three tools used by
 the `sosyal_medya_agent` sub-agent:
@@ -65,7 +65,7 @@ the `sosyal_medya_agent` sub-agent:
   signed App URL never has to pass through the model as plain text.
 - `worker_yayin_durumu_sorgula(job_id)` reads that row back — `status`,
   `results`, `error`, matching
-  [`schemas/publish_result.schema.json`](../../schemas/publish_result.schema.json).
+  [`schemas/publish_result.schema.json`](../marketing-agent-assets/schemas/publish_result.schema.json).
   **This is not optional to skip:** queuing a job successfully only means
   the row was inserted, not that anything was published. The agent's system
   prompt tells it to check this before logging a publish as successful —
@@ -122,7 +122,7 @@ not a bug — building a real headless-approval channel is future work.
 from the request payload before inserting. A second call with the exact
 same content — a network retry, an LLM re-attempting a tool call it thinks
 failed — hits the unique index added in
-[`../../social-media-worker/migrations/002_publish_jobs_idempotency_key.sql`](../../social-media-worker/migrations/002_publish_jobs_idempotency_key.sql)
+[`../marketing-agent-assets/social-media-worker/migrations/002_publish_jobs_idempotency_key.sql`](../marketing-agent-assets/social-media-worker/migrations/002_publish_jobs_idempotency_key.sql)
 (and this repo's own
 [`migrations/002_agent_jobs_idempotency_key.sql`](./migrations/002_agent_jobs_idempotency_key.sql))
 and returns the **existing** job's status instead of creating a duplicate.
@@ -166,17 +166,17 @@ side: a new `asset_collector_agent` sub-agent with three tools
 (`app_baglanti_durumu`, `app_asset_listele`, `app_asset_detay`, in
 [`MarketingApp/araclar/app_asset_araclari.py`](./MarketingApp/araclar/app_asset_araclari.py))
 that read approved media assets — matching
-[`schemas/asset.schema.json`](../../schemas/asset.schema.json) — from **any
-app** that implements the [asset-pool contract](../../asset-pool/README.md):
+[`schemas/asset.schema.json`](../marketing-agent-assets/schemas/asset.schema.json) — from **any
+app** that implements the [asset-pool contract](../marketing-agent-assets/asset-pool/README.md):
 `GET {APP_INTERNAL_URL}{APP_ASSETS_PATH}` and
 `GET {APP_INTERNAL_URL}{APP_ASSETS_PATH}/{id}` (default path `/api/assets`),
 bearer-token auth. The agent is not coupled to any particular app.
 
 To automate your own app, implement those two endpoints — the
-[`asset-pool/`](../../asset-pool) kit is a dependency-free handler plus a
+[`asset-pool/`](../marketing-agent-assets/asset-pool) kit is a dependency-free handler plus a
 conformance checker (`node asset-pool/bin/check.js <url> --token …`) — then
 set `APP_INTERNAL_URL` / `APP_INTERNAL_TOKEN` (and `APP_ASSETS_PATH` if you
-mounted it elsewhere). [Kara Tahta](../../asset-pool/examples/karatahta) is
+mounted it elsewhere). [Kara Tahta](../marketing-agent-assets/asset-pool/examples/karatahta) is
 included purely as a worked example of mapping a real app onto the contract.
 
 **Honest scope:** this repository contains no live App. The kit and the Kara
@@ -270,7 +270,7 @@ treat a finished render as ready to publish.
 Same honest-scope rule as the rest of this section: without an App that
 implements `POST {APP_INTERNAL_URL}{APP_VIDEO_REQUESTS_PATH}` (default
 `/api/video-requests` — see `asset-pool/README.md`), both tools return a
-clear "not implemented" error. [Kara Tahta](../../asset-pool/examples/karatahta/videoSource.js)
+clear "not implemented" error. [Kara Tahta](../marketing-agent-assets/asset-pool/examples/karatahta/videoSource.js)
 is included as a worked example (Kara Tahta's own `/api/generate-lesson` /
 `/api/jobs/:id`), tested against a fake backend, not a live one.
 
@@ -291,9 +291,9 @@ ever touching the browser-based social tools):
 
 These insert into a new `platform_data_jobs` Supabase table (migration:
 [`migrations/001_agent_jobs.sql`](./migrations/001_agent_jobs.sql)'s sibling
-in [`../../platform_data_worker/migrations/`](../../platform_data_worker/migrations))
+in [`../marketing-agent-assets/platform_data_worker/migrations/`](../marketing-agent-assets/platform_data_worker/migrations))
 and read the result back — the agent process never holds a YouTube, Instagram,
-TikTok, X, or Reddit credential. **[`platform_data_worker`](../../platform_data_worker)
+TikTok, X, or Reddit credential. **[`platform_data_worker`](../marketing-agent-assets/platform_data_worker)
 is the real thing here**, not a stub behind a future App: it's a standalone,
 runnable worker (own `requirements.txt`, own `README.md`) that holds those
 credentials, checks every request against a hand-written allowlist in each
@@ -326,7 +326,7 @@ never touch `BaseModel`/the browser session concurrently:
    via `psql`/Studio — queues work just by inserting a row; nothing needs to
    import Python to use it.
 2. **MCP server** (Streamable HTTP, `POST /mcp`) — same protocol and
-   bearer-token pattern as [`mcp_worker`](../../mcp_worker): any MCP client
+   bearer-token pattern as [`mcp_worker`](../marketing-agent-assets/mcp_worker): any MCP client
    can call `run_marketing_task(task, context)` on demand. Because a task can
    run long (`browser_agent`'s tool calls have no timeout), it blocks up to
    `AGENT_WORKER_WAIT_MS` and then returns `{status:"running", jobId}` instead

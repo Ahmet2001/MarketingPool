@@ -8,9 +8,9 @@ Mimar is a Python agent platform built around a single orchestrator LLM (`BaseMo
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > This copy lives at `agents/marketing-agent` inside
-> [`marketing-agent-assets`](../../README.md), where it's the
-> [`future_work.md`](../../future_work.md) "marketing agent" wired to
-> [`social-media-worker`](../../social-media-worker)'s publish queue. See
+> [`marketing-agent-assets`](../marketing-agent-assets/README.md), where it's the
+> [`future_work.md`](../marketing-agent-assets/future_work.md) "marketing agent" wired to
+> [`social-media-worker`](../marketing-agent-assets/social-media-worker)'s publish queue. See
 > [`AGENT.md`](./AGENT.md) for what that integration actually covers today.
 > Everything below describes running this project on its own — that part is
 > unchanged.

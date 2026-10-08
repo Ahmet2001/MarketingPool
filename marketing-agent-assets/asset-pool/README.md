@@ -183,7 +183,7 @@ fine having actually start (and possibly bill) a render.
 
 ## Point the agent at it
 
-In `agents/marketing-agent/.env`:
+In `agent/.env`:
 
 ```bash
 APP_INTERNAL_URL=https://your-app.example.com
@@ -199,7 +199,7 @@ generation, gated by an approval step and a daily cap — see the agent's
 `AGENT.md`). A successful listing is cached in the agent workspace so other
 agents reuse the URLs. One pool per agent process — to automate several
 apps, run one agent worker per app. See the agent's
-[`AGENT.md`](../agents/marketing-agent/AGENT.md).
+[`AGENT.md`](../../agent/AGENT.md).
 
 ## Examples
 
