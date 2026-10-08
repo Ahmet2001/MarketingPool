@@ -20,7 +20,9 @@ acikca reddeder (fail-closed, ama gereksiz beklemeden).
 
 from __future__ import annotations
 
-from typing import Awaitable, Callable
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Awaitable, Callable, Iterable, Iterator
 
 ApprovalHandler = Callable[[str, str], Awaitable[bool]]
 
@@ -55,3 +57,42 @@ async def reject_all_approvals(action_id: str, description: str) -> bool:
         f"{action_id} — {description}"
     )
     return False
+
+
+# ---------------------------------------------------------------- onay: isi baslatan verir
+#
+# Bir isi kuyruga koyan taraf (insan ya da yazma yetkisi olan bir uygulama) `payload.approved_tools`
+# ile hangi tool'larin calisabilecegini ONCEDEN soyleyebilir. Bu liste modelin erisemedigi bir
+# yerden gelir: model onu degistiremez, bir gorev metni de degistiremez. Bir tool'un onayi, o is
+# calisirken listede adi geciyorsa verilir; baska hicbir sey onay sayilmaz.
+
+_job_approvals: ContextVar[frozenset[str]] = ContextVar("job_approvals", default=frozenset())
+
+MAX_JOB_APPROVALS = 32
+
+
+def clean_approved_tools(value: object) -> frozenset[str]:
+    """`payload.approved_tools`'u temizler: sadece makul uzunlukta metinlerden olusan, kisa bir liste."""
+    if not isinstance(value, (list, tuple, set, frozenset)):
+        return frozenset()
+    names = [item.strip() for item in value if isinstance(item, str) and 0 < len(item.strip()) <= 128]
+    return frozenset(names[:MAX_JOB_APPROVALS])
+
+
+@contextmanager
+def job_approvals(approved_tools: Iterable[str] | object) -> Iterator[frozenset[str]]:
+    """Bu `with` blogu (ve icinden baslayan gorevler) boyunca verilen tool onaylarini gecerli kilar."""
+    granted = clean_approved_tools(approved_tools)
+    token = _job_approvals.set(granted)
+    try:
+        yield granted
+    finally:
+        _job_approvals.reset(token)
+
+
+async def approve_if_granted_by_job(action_id: str, description: str) -> bool:
+    """Bassiz worker icin handler: sadece isi baslatanin onceden onayladigi tool'lara izin verir."""
+    if action_id in _job_approvals.get():
+        print(f"✅ [Approval] Is baslatan tarafindan onaylanmisti: {action_id}")
+        return True
+    return await reject_all_approvals(action_id, description)

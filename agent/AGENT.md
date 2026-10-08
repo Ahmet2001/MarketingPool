@@ -252,7 +252,9 @@ on `asset_collector_agent`:
   is sent, because generation can be expensive and isn't easily undone:
   - **Approval**, via the same `approval_runtime` gate as publishing —
     `VIDEO_GENERATION_REQUIRES_APPROVAL` (default `true`) can turn it off
-    for a deployment that has wired its own headless approval flow.
+    for a deployment that has wired its own headless approval flow. In the
+    worker, the job can approve it by listing `video_uretimi_iste` in
+    `approved_tools`.
   - **A daily cap** (`VIDEO_GENERATION_MAX_PER_DAY`, default 3) counting
     distinct requests in the last 24h, tracked in a small workspace log.
   An `Idempotency-Key` (derived from the request content) also goes on the
@@ -374,8 +376,13 @@ same project `social-media-worker` uses; without them,
 `worker_yayin_durumu_sorgula` return a clear configuration error instead of
 silently failing. Remember the two tools that write also require approval
 (see "Approval gate" above) — from the terminal that's an interactive
-prompt; from `worker.py` it's an automatic rejection until a headless
-approval flow is wired up.
+prompt; from `worker.py` it's rejected unless the person or app that queued
+the job approved that tool beforehand, by naming it in the job:
+`{"task": "...", "approved_tools": ["worker_video_yayinla"]}` in the
+`agent_jobs` payload. The list comes from whoever can write to the queue,
+never from the model, so a task text cannot grant it (see
+`environments/approval_runtime.py`). An MCP call has no such list yet, so
+gated tools are refused there.
 
 ## Embedding
 

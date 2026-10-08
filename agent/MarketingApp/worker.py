@@ -51,6 +51,7 @@ load_dotenv(dotenv_path=os.path.join(_PROJECT_ROOT, ".env.model"), override=True
 load_dotenv(dotenv_path=os.path.join(_PROJECT_ROOT, ".env.secrets"), override=True)
 
 from MarketingApp.agent_api import EthgentAgent
+from MarketingApp.environments.approval_runtime import approve_if_granted_by_job, job_approvals
 from MarketingApp.environments import agent_job_queue
 from MarketingApp.environments.agent_mcp_server import AgentMcpServer, build_auth_app
 from MarketingApp.environments.automation_runtime import (
@@ -145,7 +146,9 @@ async def _queue_poll_loop(ethgent_agent: EthgentAgent, poll_ms: int) -> None:
             continue
 
         try:
-            result = await _execute_task_with_busy_retry(ethgent_agent, task, context, job_id=job_id, label=owner_ref)
+            # Onay isi baslatandan gelir (payload.approved_tools), modelden degil.
+            with job_approvals(payload.get("approved_tools")):
+                result = await _execute_task_with_busy_retry(ethgent_agent, task, context, job_id=job_id, label=owner_ref)
             await asyncio.to_thread(agent_job_queue.finish_agent_job, job_id, result)
             print(f"✅ [Worker] Is tamamlandi: {job_id}")
         except AutomationBusyError as exc:
@@ -210,7 +213,7 @@ async def _run_mcp_server(ethgent_agent: EthgentAgent, host: str, port: int, tok
 async def main() -> None:
     print("🚀 [Worker] Ethgent worker baslatiliyor...")
 
-    ethgent_agent = EthgentAgent()
+    ethgent_agent = EthgentAgent(approval_handler=approve_if_granted_by_job)
 
     poll_ms = max(1000, int(os.getenv("AGENT_WORKER_POLL_MS") or _DEFAULT_POLL_MS))
     mcp_host = os.getenv("AGENT_WORKER_MCP_HOST") or _DEFAULT_MCP_HOST
