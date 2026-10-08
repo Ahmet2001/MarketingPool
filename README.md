@@ -1,6 +1,6 @@
 # MarketingPool
 
-**A marketing agent, the open pool of capabilities it draws on, and a Docker setup that runs all of it on your own machine.**
+**A worked example of fitting an LLM agent to a system: the agent, the open pool of assets it connects through, and a Docker setup that runs all of it on your own machine.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
 [![Docker Compose](https://img.shields.io/badge/run%20with-Docker%20Compose-2496ED?logo=docker&logoColor=white)](#quick-start)
@@ -10,14 +10,18 @@
 [![Queue](https://img.shields.io/badge/queue-Postgres%20%2B%20PostgREST-336791?logo=postgresql&logoColor=white)](./docker/README.md)
 [![Contributions welcome](https://img.shields.io/badge/open%20contribution-welcome-brightgreen)](#open-contribution)
 
-Most marketing work is repeatable: collect data, make an asset, publish it, look at the result. This repository keeps the **thinking** (an LLM agent), the **doing** (small workers that hold credentials and talk to platforms) and the **shared building blocks** (platform toolboxes, schemas, decision guides) separate, so each can be understood, tested and replaced on its own.
+The idea behind the project is that an agent becomes useful when it is **fitted to a system**: specialised for a domain, connected so it can read what happens there and act on it, and limited in what it may do. MarketingPool shows that with marketing as the domain. It keeps the **thinking** (a customisable agent), the **connection** (workers that hold credentials, plus toolboxes, contracts and guides that anyone can add to) and the **factory** that produces new tools for both (MarketingStudio) separate, so each can be understood, tested and replaced on its own. Read the [manifesto](./manifesto.md) for the reasoning.
+
+This repository is the example where the first two meet. It is not the only way to combine them and nothing else depends on living here.
 
 ## Contents
 
 - [What is in here](#what-is-in-here)
+- [The big picture](#the-big-picture)
 - [How the pieces fit](#how-the-pieces-fit)
 - [Quick start](#quick-start)
 - [Talk to the agent](#talk-to-the-agent)
+- [Give the agent a new tool from the factory](#give-the-agent-a-new-tool-from-the-factory)
 - [Configuration](#configuration)
 - [What has been tested](#what-has-been-tested)
 - [Open contribution](#open-contribution)
@@ -28,10 +32,32 @@ Most marketing work is repeatable: collect data, make an asset, publish it, look
 
 | Folder | What it is |
 | --- | --- |
-| [`agent/`](./agent) | **The marketing agent (Ethgent).** An orchestrator LLM that hands work to specialised sub-agents: social media, content creation, asset collection, platform data. It runs as a worker: it polls a job queue and also serves MCP. Talks to OpenAI-compatible model APIs: tested with DeepSeek; Gemini and Kimi/Moonshot are supported in the code. |
+| [`agent/`](./agent) | **The agent (Ethgent).** An orchestrator LLM that hands work to specialised sub-agents: social media, content creation, asset collection, platform data. It runs as a worker: it polls a job queue and also serves MCP. Talks to OpenAI-compatible model APIs: tested with DeepSeek; Gemini and Kimi/Moonshot are supported in the code. |
 | [`marketing-agent-assets/`](./marketing-agent-assets) | **The open pool.** Queue workers (publishing, scheduling, read-only platform data, MCP), official-API toolboxes for X, Instagram, Reddit, YouTube and TikTok, an app-connection kit (`asset-pool`), shared JSON schemas, LLM decision guides (skills) and examples. |
 | [`docker-compose.yml`](./docker-compose.yml) · [`docker/`](./docker) | Runs the agent and the workers together on one machine, with a **local queue** (Postgres + PostgREST) where a hosted Supabase would normally be. |
-| [`manifesto.md`](./manifesto.md) | Why these pieces exist and how they relate. |
+| [`manifesto.md`](./manifesto.md) | The main manifesto: why these pieces exist, how they relate, what is real today. |
+
+## The big picture
+
+Four repositories, one idea. None of them is a placeholder for another.
+
+| Repository | Role |
+| --- | --- |
+| [**Ethgent**](./agent) (upstream: [BrowserAgent](https://github.com/Ahmet2001/BrowserAgent)) | The customisable agent: an orchestrator, sub-agents and tools that live in YAML and packs. Tuned for social media today; the same shape can be fitted to other domains. |
+| [**Marketing Agent Assets**](./marketing-agent-assets) | The connection to a system, and an open pool: workers, connectors, toolboxes, contracts, guides. There is no single "asset"; anyone can add their own. |
+| [**MarketingStudio**](https://github.com/Ahmet2001/MarketingStudio) | The factory: build a workflow once, export it as an agent pack, MCP server, worker and more. |
+| **MarketingPool** (this repository) | The example: the agent and the assets together, running with Docker. |
+
+```mermaid
+flowchart LR
+    S[MarketingStudio<br/>factory] -->|exports workflows, tools, packs| A
+    subgraph Pool[MarketingPool: this repository]
+        E[Ethgent<br/>agent] <-->|requests, results| A[Marketing Agent Assets<br/>workers, connectors, tools]
+    end
+    A <-->|data in, content out| Y([Your system or app])
+```
+
+When the agent and the assets are joined to a system, the LLM gets feedback from it (it can read your data) and can give something back (it can publish, or write into your app). Connected to your app, it can collect material from it, create content and publish it.
 
 ## How the pieces fit
 
@@ -92,6 +118,10 @@ curl "http://127.0.0.1:54321/rest/v1/agent_jobs?select=status,results&order=crea
 **Through MCP.** The agent also serves [MCP](https://modelcontextprotocol.io) over HTTP at `http://127.0.0.1:8091/mcp`, authenticated with `Authorization: Bearer <AGENT_MCP_TOKEN>` (the value is in your `.env`).
 
 **Look at the queue.** `docker compose exec db psql -U postgres -c "select status, count(*) from agent_jobs group by 1"`.
+
+## Give the agent a new tool from the factory
+
+Write a workflow in [MarketingStudio](https://github.com/Ahmet2001/MarketingStudio), export it with the `agent-bundle` target, and install the result into the running agent. The agent then calls it as a tool. Example packs are in [`packs/`](./packs); the steps, and how approval works for a workflow that changes something outside, are in [`docker/README.md`](./docker/README.md#putting-a-workflow-from-the-factory-to-work).
 
 ## Configuration
 

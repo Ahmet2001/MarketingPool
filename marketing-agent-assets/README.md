@@ -3,23 +3,41 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Architecture](https://img.shields.io/badge/architecture-app%20%E2%86%94%20worker%20%E2%86%94%20agent-6f42c1)](./future_work.md)
 
-Open-source building blocks for marketing systems that need to turn approved content into channel-ready assets and publish them safely. Use the deployable worker, platform toolboxes, LLM skills, and shared schemas independently—or combine them as the foundation for a marketing agent. It is also meant to grow in the open: anyone can add a platform, an action, a skill, or a connection to their own app (see [Open contribution](#open-contribution)).
+**The connection between an LLM agent and your system, and an open pool that anyone can add to.**
 
-> Status: the worker, toolbox, schema, example, and skill layers are available. A first `agent` is wired to the worker's `publish_jobs` queue for its two supported actions (`video.publish`, `instagram.carousel`), with an approval gate and idempotency keys in front of it. All five items in `future_work.md`'s planned worker capability surface now have an agent-side implementation: [`asset-pool/`](./asset-pool) is a contract + kit any app can implement for `collect_assets` (required) and the optional `prepare_media`/`request_video_generation` — a real app (Kara Tahta, sibling checkout, not in this repo) now has it wired into its own server, verified by starting that server and hitting it over HTTP, see [`asset-pool/examples/karatahta/README.md`](./asset-pool/examples/karatahta/README.md); [`platform_data_worker/`](./platform_data_worker) is a real, standalone worker (not a stub) for `collect_platform_data`, enforcing a per-platform read-only allowlist declared in each `toolboxes/*/manifest.yaml`. See [`agent/AGENT.md`](../agent/AGENT.md) for exactly what's real versus what still needs live credentials on the other end.
+An agent is only useful inside a system if it can read what happens there and act on it. This repository holds the pieces that make that connection: workers that hold credentials and talk to platforms, connectors and toolboxes, a small contract for exposing your own app, shared schemas and decision guides. Use any of them on their own, or combine them with an agent such as [Ethgent](../agent). The [manifesto](../manifesto.md) explains why the pieces are separate.
 
-## Why this exists
+## What it is for
 
-Most marketing automation projects mix strategy, model prompts, tokens, browser sessions, publishing, and application data in one process. This repository keeps those concerns separate:
+- **Connect an agent to a system.** The agent never holds platform credentials or database access. It writes a validated request; a worker that owns the credentials checks it and acts. Your app stays the source of truth.
+- **Close the loop.** With the agent and these assets joined, the model gets feedback (it can read your data and platform data) and can give something back (publish, or write into your app). Connected to your app, it can collect material from it, create content and publish it.
+- **Be shared.** There is no single "asset". Anyone can add their own tool, connector, worker, guide or app connection, so nobody rebuilds the same integration alone. This open, shared character is a core part of the project (see [Open contribution](#open-contribution)).
 
-- **App** remains the source of truth for users, content, approvals, media, and rendering/video-generation capabilities.
-- **Worker environment** provides bounded operational access to the app and external publishing APIs.
-- **Agent** will reason over approved data and skills, then request validated actions rather than receiving secrets or unrestricted infrastructure access.
+It is not a placeholder for something else. It is the part of the system that makes an agent usable outside its own process.
 
-```text
-App ⇄ Social-media worker environment ⇄ Marketing agent
+## Where it sits
+
+Four repositories, one idea: **fit an LLM agent to your own system.**
+
+| Repository | Role |
+| --- | --- |
+| [**Ethgent**](https://github.com/Ahmet2001/BrowserAgent) | The customisable agent: an orchestrator, sub-agents and tools that live in YAML and packs. Tuned for social media today; the same shape can be fitted to other domains. A separate project that stands on its own. |
+| **Marketing Agent Assets** (this repository) | The connection and the open pool: workers, connectors, toolboxes, contracts, guides. |
+| [**MarketingStudio**](https://github.com/Ahmet2001/MarketingStudio) | The factory. Build a workflow once, export it as an agent pack, MCP server, worker and more, and feed it to the agent and the assets. |
+| [**MarketingPool**](https://github.com/Ahmet2001/MarketingPool) | A worked example: the agent and these assets together, running with Docker. |
+
+```mermaid
+flowchart LR
+    S[MarketingStudio<br/>factory] -->|exports workflows, tools, packs| A
+    subgraph Pool[MarketingPool: an example]
+        E[Ethgent<br/>agent] <-->|requests, results| A[Marketing Agent Assets<br/>workers, connectors, tools]
+    end
+    A <-->|data in, content out| Y([Your system or app])
 ```
 
-Read the [future architecture and delivery plan](./future_work.md) for the responsibility map, security boundaries, and agent roadmap.
+## What has been checked
+
+The worker, toolbox, schema, example and skill layers are available. The agent is wired to the worker's `publish_jobs` queue for its two supported actions (`video.publish`, `instagram.carousel`), with an approval gate and idempotency keys in front of it. [`asset-pool/`](./asset-pool) is a contract and kit any app can implement (`collect_assets` is required; `prepare_media` and `request_video_generation` are optional); one real app has it wired into its own server, checked over HTTP ([example](./asset-pool/examples/karatahta/README.md)). [`platform_data_worker/`](./platform_data_worker) is a standalone worker for read-only platform data that refuses anything not on the per-platform allowlist in each `toolboxes/*/manifest.yaml`. What is real and what still needs live credentials is listed in [`agent/AGENT.md`](../agent/AGENT.md). Real publishing and real platform data have not been run.
 
 ## Open contribution
 
@@ -62,8 +80,8 @@ What every contribution has to respect (details in [CONTRIBUTING.md](./CONTRIBUT
 The worker is intentionally independent of any specific app. Your backend creates a queue job with an HTTPS asset URL; the worker claims and publishes it.
 
 ```bash
-git clone https://github.com/Ahmet2001/marketing-agent-assets.git
-cd marketing-agent-assets/social-media-worker
+git clone https://github.com/Ahmet2001/MarketingPool.git
+cd MarketingPool/marketing-agent-assets/social-media-worker
 cp .env.example .env
 npm install
 ```
@@ -127,11 +145,9 @@ Use the schemas as the boundary between applications, workers, toolboxes, and fu
 
 Credentials, database access, and private signed URLs must never enter an LLM prompt or a public job payload.
 
-## Current bridge and roadmap
+## Boundaries
 
-The future agent will manage content creation, video-generation workflows, and publication decisions. Until it exists, the worker owns only a narrow, explainable algorithmic bridge: validation, media preparation, platform-format checks, queue execution, retries, and results.
-
-It must not become an autonomous strategy or engagement engine. See [future_work.md](./future_work.md) for the phased migration plan.
+The worker owns a narrow, explainable algorithmic bridge: validation, media preparation, platform-format checks, queue execution, retries and results. Strategy and engagement decisions belong to the agent and, for anything that affects an outside account, to an approval by a person. The worker must not become an autonomous strategy or engagement engine. See [future_work.md](./future_work.md) for the phased plan.
 
 ## Contributing
 
