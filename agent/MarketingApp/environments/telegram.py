@@ -22,7 +22,10 @@ except ImportError as pydub_import_error:
     AudioSegment = None
     _PYDUB_IMPORT_ERROR = pydub_import_error
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder, ApplicationHandlerStop, CommandHandler, MessageHandler,
+    TypeHandler, filters, ContextTypes,
+)
 
 from MarketingApp.llms import list_submodels
 from MarketingApp.environments.automation_runtime import (
@@ -30,6 +33,8 @@ from MarketingApp.environments.automation_runtime import (
     try_acquire_automation,
 )
 from MarketingApp.araclar.vlm_araclari import register_bot
+from MarketingApp import telemetry
+from MarketingApp.environments import access, remote_commands
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -260,7 +265,7 @@ async def _send_cevap_metinleri(context, chat_id: int, cevap_metinleri: list):
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🤖 *Merhaba! Ben Mimar AI Asistanım.*\n\n"
+        "🤖 *Merhaba! Ben Ethgent AI Asistanım.*\n\n"
         "📝 Yazılı mesaj gönder veya 🎤 sesli mesaj gönder.\n"
         "📸 Fotoğraf gönderirsen analiz edebilirim.\n\n"
         "Kullanılabilir komutlar:\n"
@@ -289,7 +294,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
 
     mesaj = (
-        "🧠 *Mimar AI Yetkinlikleri*\n\n"
+        "🧠 *Ethgent AI Yetkinlikleri*\n\n"
         "🔧 *Araçlarım:*\n" + araç_listesi + "\n\n"
         "🤖 *Uzmanlaşmış Sub-Ajanlarım:*\n" + submodel_listesi + "\n\n"
         "💡 Natural dil ile her şeyi yapabilirim!"
@@ -557,6 +562,51 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
 
 
+# --- YETKILENDIRME VE UZAKTAN YONETIM ---
+
+_ADMIN_COMMANDS = ["agents", "agent", "tools", "tool", "errors", "logs", "runs", "run", "usage", "heartbeat", "reload"]
+_TELEGRAM_MESSAGE_LIMIT = 3900
+
+
+async def auth_gate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Her update'ten once calisir; yetkisiz kullaniciyi durdurur.
+
+    TELEGRAM_ALLOWED_USER_IDS tanimli degilse herkese aciktir (eski davranis; acilista uyarilir).
+    """
+    telemetry.set_source("telegram")
+    user = update.effective_user
+    user_id = user.id if user else None
+
+    message = update.effective_message
+    if message and message.text and message.text.split()[0].split("@")[0].lower() == "/id":
+        return  # /id herkese acik: kullanici kendi ID'sini ogrenip allowlist'e ekleyebilsin
+
+    if access.is_allowed("telegram", user_id):
+        return
+    telemetry.record_event("remote", f"telegram:{user_id} yetkisiz erisim engellendi")
+    raise ApplicationHandlerStop
+
+
+async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    await update.message.reply_text(f"Telegram kullanici ID'n: {user.id if user else '?'}")
+
+
+async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Terminal yonetim komutlari (/agent, /tool, /heartbeat, /usage ...). Yalnizca TELEGRAM_ADMIN_IDS."""
+    user = update.effective_user
+    user_id = user.id if user else None
+    text = update.message.text or ""
+    if not access.is_admin("telegram", user_id):
+        telemetry.record_event("remote", f"telegram:{user_id} yonetim komutu denedi (admin degil): {text[:120]}")
+        await update.message.reply_text("Bu komut icin yetkin yok.")
+        return
+
+    output = await remote_commands.run_remote_command(_base_model, text, channel="telegram", actor=user_id)
+    for part in remote_commands.split_message(output, _TELEGRAM_MESSAGE_LIMIT):
+        await update.message.reply_text(part)
+
+
 async def error_handler(update, context: ContextTypes.DEFAULT_TYPE):
     print(f"\n🔴 [GLOBAL HATA]: {context.error}")
     traceback.print_exception(type(context.error), context.error, context.error.__traceback__)
@@ -575,6 +625,13 @@ async def run_telegram_bot(token: str):
         print(f"🤖 SubModel [{name}]: {desc[:80]}...")
 
     app = ApplicationBuilder().token(token).build()
+
+    for warning in access.startup_warnings("telegram"):
+        print(f"⚠️ [Telegram] {warning}")
+    app.add_handler(TypeHandler(Update, auth_gate), group=-1)
+    app.add_handler(CommandHandler("id", id_command))
+    if access.admin_ids("telegram"):
+        app.add_handler(CommandHandler(_ADMIN_COMMANDS, admin_command))
 
     # Komut handler'ları
     app.add_handler(CommandHandler("start",  start_command))

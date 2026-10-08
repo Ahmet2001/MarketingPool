@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from .base import SubModel, register_submodel, SubModelRateLimitError
+from MarketingApp import telemetry
 from MarketingApp.araclar import ARAMA_ARACLARI
 
 load_dotenv()
@@ -65,6 +66,7 @@ class ArastirmaAgentSubModel(SubModel):
         )
 
         final_response = "[ArastirmaAgent yanıt üretemedi]"
+        tracker = telemetry.LiveUsageTracker(self.name, self.model_id)
 
         try:
             async with self._client.aio.live.connect(
@@ -75,6 +77,7 @@ class ArastirmaAgentSubModel(SubModel):
                 await session.send(input=gorev, end_of_turn=True)
 
                 async for message in session.receive():
+                    tracker.observe(message)
                     if message.server_content and message.server_content.model_turn:
                         for part in message.server_content.model_turn.parts:
                             if part.text:
@@ -102,6 +105,8 @@ class ArastirmaAgentSubModel(SubModel):
                 raise SubModelRateLimitError(self.name, self.tools)
             print(f"  ❌ [{self.name}] Live API Hatası: {e}")
             raise e
+        finally:
+            tracker.flush()
 
         print(f"  ✅ [{self.name}] Araştırma tamamlandı.")
         return final_response

@@ -26,6 +26,7 @@ from .runtime_config import (
     get_provider_display_name,
 )
 from MarketingApp.araclar import BASE_ARACLAR
+from MarketingApp import telemetry
 
 
 INPUT_RATE = 16000
@@ -35,7 +36,7 @@ PROVIDER_FAILURE_COOLDOWN_SECONDS = 10
 DEFAULT_TOOL_TIMEOUT_SECONDS = 150.0
 
 SYSTEM_INSTRUCTION = """
-Sen "Mimar" projesinin merkezi orkestratorusun.
+Sen "Ethgent" projesinin merkezi orkestratorusun.
 
 CALISMA KURALLARI:
 1. Yalnizca bu istekte tool semasinda gorunen aktif tool ve alt ajanlari kullan.
@@ -265,7 +266,21 @@ class BaseModel:
             return bool(self.active_agents.get(name, False)) and bool(self.active_tools.get(name, False))
         return bool(self.active_tools.get(name, True))
 
+    def default_system_instruction(self) -> str:
+        """Config override'i olmadan kullanilan, kod icindeki varsayilan orkestrator promptu."""
+        return SYSTEM_INSTRUCTION.strip()
+
     def _build_runtime_system_instruction(self) -> str:
+        from .agent_studio import read_orchestrator_prompt
+
+        base_instruction = SYSTEM_INSTRUCTION
+        try:
+            override = read_orchestrator_prompt()
+            if override:
+                base_instruction = override
+        except Exception:
+            pass
+
         active_rules = []
         inactive_names = []
 
@@ -295,7 +310,7 @@ class BaseModel:
                 + "\n".join(f"- `{name}` pasif; bu ismi tool/ajan olarak cagirma." for name in inactive_names)
             )
 
-        return SYSTEM_INSTRUCTION.rstrip() + "\n" + routing_block + "\n"
+        return base_instruction.rstrip() + "\n" + routing_block + "\n"
 
     def reload_agent_studio(self) -> dict:
         self._configure_agent_runtime()
@@ -527,6 +542,7 @@ class BaseModel:
         if len(self.logs) > 100:
             self.logs.pop(0)
         print(f"[{t}] [{type.upper()}] {message}")
+        telemetry.record_event(type, message)
 
     async def request_approval(self, action_id: str, description: str):
         ev = asyncio.Event()
@@ -732,6 +748,8 @@ class BaseModel:
                     return b"", final_text, direct_texts, cevap_metinleri
                 raise
 
+            telemetry.record_usage("base", self.model, getattr(completion, "usage", None))
+
             message = completion.choices[0].message
             current_text = self._extract_message_text(message)
             tool_calls = getattr(message, "tool_calls", None) or []
@@ -791,6 +809,19 @@ class BaseModel:
         return b"", final_text, direct_texts, cevap_metinleri
 
     async def text_query(self, user_text: str, context: str = "", image_bytes: bytes = None, on_direct_text=None, on_cevap_metni=None) -> tuple[bytes, str, list, list]:
+        """Tum kanallarin (terminal, heartbeat, Telegram, Discord, embed API) gectigi tek nokta.
+
+        Cagriyi telemetry'de bir 'run' olarak kaydeder; cagiran zaten bir run actiysa (ornegin
+        heartbeat) ona katilir, boylece LLM kullanimi dogru run'a yazilir.
+        """
+        label = " ".join((user_text or "").split())[:80] or "(bos mesaj)"
+        with telemetry.run_scope(telemetry.current_source(), label, detail="text_query") as run:
+            result = await self._text_query_impl(user_text, context, image_bytes, on_direct_text, on_cevap_metni)
+            if isinstance(result, tuple) and len(result) > 1:
+                run.set_summary(result[1])
+            return result
+
+    async def _text_query_impl(self, user_text: str, context: str = "", image_bytes: bytes = None, on_direct_text=None, on_cevap_metni=None) -> tuple[bytes, str, list, list]:
         self._current_image = image_bytes
         try:
             from MarketingApp.araclar import rol_oku

@@ -9,7 +9,11 @@ import os
 import re
 import ast
 import shutil
+import subprocess
 import sys
+import tempfile
+import types
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -33,6 +37,7 @@ SUBMODELS_INIT_PATH = SUBMODELS_DIR / "__init__.py"
 AGENTS_CONFIG_PATH = CONFIG_DIR / "agents.yaml"
 CUSTOM_TOOLS_CONFIG_PATH = CONFIG_DIR / "custom_tools.yaml"
 AGENT_PACKS_CONFIG_PATH = CONFIG_DIR / "agent_packs.yaml"
+ORCHESTRATOR_PROMPT_PATH = CONFIG_DIR / "orchestrator_prompt.md"
 MODEL_ENV_PATH = APP_DIR.parent / ".env.model"
 
 AGENT_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{2,63}$")
@@ -252,6 +257,28 @@ def ensure_agent_studio_files() -> None:
         _write_yaml(CUSTOM_TOOLS_CONFIG_PATH, _default_custom_tools_config())
     if not AGENT_PACKS_CONFIG_PATH.exists():
         _write_yaml(AGENT_PACKS_CONFIG_PATH, _default_agent_packs_config())
+
+
+def read_orchestrator_prompt() -> str:
+    """Orkestratorun (BaseModel) system prompt override'ini okur; yoksa bos dondurur.
+
+    Ayri bir dosyada tutulur (agents.yaml'in icinde degil) cunku save_agents_config()
+    her ajan duzenlemesinde tum dosyayi yeniden yazar -- oraya eklenen bir alan,
+    onu bilmeyen onlarca cagri noktasi tarafindan sessizce silinirdi.
+    """
+    if not ORCHESTRATOR_PROMPT_PATH.exists():
+        return ""
+    return ORCHESTRATOR_PROMPT_PATH.read_text(encoding="utf-8").strip()
+
+
+def write_orchestrator_prompt(text: str) -> None:
+    """Orkestrator prompt override'ini yazar; bos metin verilirse varsayilana doner (dosyayi siler)."""
+    cleaned = (text or "").strip()
+    if not cleaned:
+        ORCHESTRATOR_PROMPT_PATH.unlink(missing_ok=True)
+        return
+    ORCHESTRATOR_PROMPT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    ORCHESTRATOR_PROMPT_PATH.write_text(cleaned, encoding="utf-8")
 
 
 def validate_agent_name(name: str) -> str:
@@ -770,12 +797,13 @@ def load_custom_tool_callable(entry: dict[str, Any], *, include_disabled: bool =
         if not path.exists():
             return None, f"{path.name} bulunamadi."
         load_model_env_file()
+        # Kaynagi dogrudan derle: spec_from_file_location + exec_module __pycache__ kullanir ve .pyc
+        # dogrulamasi mtime'i SANIYE cozunurlugunde + dosya boyutuyla yapar. Ayni saniyede yapilan ayni
+        # boyutlu bir duzenleme (ornegin `return 1` -> `return 2`) sessizce eski bytecode'u calistirirdi.
         module_name = f"marketingapp_custom_tool_{name}_{path.stat().st_mtime_ns}"
-        spec = importlib.util.spec_from_file_location(module_name, path)
-        if not spec or not spec.loader:
-            return None, "Python module spec olusturulamadi."
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        module = types.ModuleType(module_name)
+        module.__file__ = str(path)
+        exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), module.__dict__)
         func = getattr(module, name, None)
         if not callable(func):
             return None, f"{name} fonksiyonu export edilmemis."
@@ -878,6 +906,65 @@ def save_agent_packs_config(entries: list[dict[str, Any]]) -> None:
             }
         )
     _write_yaml(AGENT_PACKS_CONFIG_PATH, {"version": 1, "installed_packs": normalized})
+
+
+_GITHUB_PACK_RE = re.compile(
+    r"^(?:github:|https://github\.com/)"
+    r"(?P<owner>[A-Za-z0-9][A-Za-z0-9-]{0,38})/"
+    r"(?P<repo>[A-Za-z0-9._-]{1,100}?)(?:\.git)?"
+    r"(?:@(?P<ref>[A-Za-z0-9][A-Za-z0-9._/-]{0,99}))?"
+    r"(?:#(?P<subdir>[A-Za-z0-9._][A-Za-z0-9._/-]{0,199}))?/?$"
+)
+GITHUB_CLONE_TIMEOUT_SECONDS = 120
+
+
+def is_github_pack_spec(value: str) -> bool:
+    text = str(value or "").strip()
+    return text.startswith("github:") or text.startswith("https://github.com/")
+
+
+@contextmanager
+def fetched_pack(path_value: str):
+    """Yield a local pack path; a github spec is shallow-cloned to a temp dir first.
+
+    Spec: github:owner/repo[@branch-or-tag][#subdir]  (or a plain https://github.com/owner/repo URL).
+    """
+    text = str(path_value or "").strip()
+    if not is_github_pack_spec(text):
+        yield text
+        return
+    match = _GITHUB_PACK_RE.match(text)
+    if not match:
+        raise AgentStudioError("GitHub kaynagi gecersiz. Format: github:kullanici/repo[@dal][#alt/klasor]")
+    subdir = match.group("subdir") or ""
+    if ".." in Path(subdir).parts:
+        raise AgentStudioError("Alt klasor '..' iceremez.")
+    if shutil.which("git") is None:
+        raise AgentStudioError("git bulunamadi; GitHub'dan pack cekmek icin git gerekli.")
+    url = f"https://github.com/{match.group('owner')}/{match.group('repo')}.git"
+    command = ["git", "clone", "--depth", "1", "--quiet"]
+    if match.group("ref"):
+        command.append(f"--branch={match.group('ref')}")
+    with tempfile.TemporaryDirectory(prefix="ethgent_pack_") as tmp:
+        dest = Path(tmp) / "repo"
+        try:
+            result = subprocess.run(
+                [*command, url, str(dest)],
+                capture_output=True,
+                text=True,
+                timeout=GITHUB_CLONE_TIMEOUT_SECONDS,
+                env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+            )
+        except subprocess.TimeoutExpired:
+            raise AgentStudioError("GitHub klonlama zaman asimina ugradi.") from None
+        if result.returncode != 0:
+            detail = (result.stderr or "").strip().splitlines()
+            raise AgentStudioError(f"GitHub'dan cekilemedi: {detail[-1] if detail else 'bilinmeyen hata'}")
+        shutil.rmtree(dest / ".git", ignore_errors=True)
+        root = (dest / subdir).resolve() if subdir else dest.resolve()
+        if dest.resolve() not in (root, *root.parents):
+            raise AgentStudioError("Alt klasor repo disina cikiyor.")
+        yield str(root)
 
 
 def _resolve_pack_root(path_value: str) -> Path:
@@ -1043,6 +1130,29 @@ def _materialize_pack_agent(root: Path, entry: dict[str, Any], source_file: str)
         default_prompt = root / "prompts" / f"{Path(source_file).stem}.md"
         if default_prompt.exists():
             raw["system_prompt"] = default_prompt.read_text(encoding="utf-8")
+
+    submodel_file = str(raw.pop("submodel_file", "") or "").strip()
+    if submodel_file and str(raw.get("type") or "").strip().lower() == "builtin":
+        # Pack kendi .py kaynagini tasiyor; hedefte henuz kayitli olmasa bile
+        # gecerlidir -- normalize_agent_entry'nin "zaten kodda kayitli olmali"
+        # kontrolunu (is_known_builtin_agent_name) burada BILEREK atlariz, cunku
+        # install_agent_pack kurulum sirasinda dosyayi tam da bunun icin kopyalar.
+        submodel_path = _resolve_relative_path(root, submodel_file, "Submodel dosyasi")
+        return {
+            "name": validate_agent_name(str(raw.get("name") or "")),
+            "type": "builtin",
+            "enabled": bool(raw.get("enabled", True)),
+            "description": str(raw.get("description") or "").strip(),
+            "model": str(raw.get("model") or "default").strip() or "default",
+            "tool_mode": "custom",
+            "system_prompt": str(raw.get("system_prompt") or ""),
+            "tools": _normalize_string_list(raw.get("tools")),
+            "source_file": source_file,
+            "prompt_source": prompt_file or "",
+            "submodel_file": submodel_file,
+            "submodel_path": str(submodel_path),
+        }
+
     normalized = normalize_agent_entry(raw)
     return {
         **normalized,
@@ -1097,10 +1207,17 @@ def preview_agent_pack(path_value: str) -> dict[str, Any]:
         for raw_entry, source_file in _iter_pack_agent_sources(root, manifest):
             normalized = _materialize_pack_agent(root, raw_entry, source_file)
             agents_preview.append(normalized)
-            if normalized["type"] == "builtin" and pack_type != "runtime_pack":
-                warnings.append(
-                    f"{normalized['name']} builtin tipinde. Harici Python submodel kurulumu icin runtime_pack daha uygun."
-                )
+            if normalized["type"] == "builtin":
+                if normalized.get("submodel_file"):
+                    warnings.append(
+                        f"{normalized['name']} builtin tipinde; pack kendi Python kaynagini tasiyor, "
+                        "kurulumda submodel dosyasi olarak yazilacak."
+                    )
+                elif not is_known_builtin_agent_name(normalized["name"]):
+                    warnings.append(
+                        f"{normalized['name']} builtin tipinde ama bu kurulumda bilinmiyor ve pack Python "
+                        "kaynagi tasimiyor; kurulum bu ajan icin basarisiz olacak."
+                    )
     except Exception as exc:
         errors.append(str(exc))
 
@@ -1132,7 +1249,7 @@ def preview_agent_pack(path_value: str) -> dict[str, Any]:
     }
 
 
-def install_agent_pack(path_value: str, *, overwrite: bool = False) -> dict[str, Any]:
+def install_agent_pack(path_value: str, *, overwrite: bool = False, source_label: str | None = None) -> dict[str, Any]:
     preview = preview_agent_pack(path_value)
     if preview["errors"]:
         raise AgentStudioError("Pack preview hata verdi; kurulum yapilmadi.")
@@ -1169,9 +1286,19 @@ def install_agent_pack(path_value: str, *, overwrite: bool = False) -> dict[str,
     existing_agents = {item["name"]: dict(item) for item in agent_config["agents"]}
     updated_agents = list(agent_config["agents"])
     installed_agent_names = []
+    builtin_submodel_write_plan: list[tuple[str, Path, Path]] = []
     for agent in preview["agents"]:
-        if agent["type"] == "builtin":
-            raise AgentStudioError("Harici builtin/runtime agent kurulumu bu MVP'de acik degil. Agent'i config tipinde paketle.")
+        submodel_path = agent.get("submodel_path")
+        if agent["type"] == "builtin" and submodel_path:
+            target_path = _builtin_module_path(agent["name"])
+            if target_path.exists() and not overwrite:
+                raise AgentStudioError(f"{target_path.name} zaten var; overwrite acilmadan kurulamaz.")
+            builtin_submodel_write_plan.append((agent["name"], Path(submodel_path), target_path))
+        elif agent["type"] == "builtin" and not is_known_builtin_agent_name(agent["name"]):
+            raise AgentStudioError(
+                f"{agent['name']} bu kurulumda bilinen bir builtin degil ve pack Python kaynagi tasimiyor; "
+                "kurulamaz."
+            )
         existing = existing_agents.get(agent["name"])
         if existing and not overwrite:
             raise AgentStudioError(f"{agent['name']} zaten agents.yaml icinde var; overwrite ile tekrar kur.")
@@ -1199,6 +1326,16 @@ def install_agent_pack(path_value: str, *, overwrite: bool = False) -> dict[str,
         existing_custom_entries[name] = entry
 
     save_custom_tools_config(updated_custom_entries)
+
+    for name, source_path, target_path in builtin_submodel_write_plan:
+        source_text = source_path.read_text(encoding="utf-8")
+        try:
+            compile(source_text, str(target_path), "exec")
+        except SyntaxError as exc:
+            raise AgentStudioError(f"{name} icin submodel kaynagi hatali: {exc}") from exc
+        target_path.write_text(source_text, encoding="utf-8")
+        _ensure_submodels_init_import(name)
+
     for agent in preview["agents"]:
         existing = existing_agents.get(agent["name"])
         if existing:
@@ -1219,6 +1356,8 @@ def install_agent_pack(path_value: str, *, overwrite: bool = False) -> dict[str,
         installed_agent_names.append(agent["name"])
 
     save_agents_config(updated_agents, agent_config["global_disabled_tools"])
+    for name, _source_path, _target_path in builtin_submodel_write_plan:
+        import_scaffolded_builtin_submodel(name)
     if installed_root.exists():
         shutil.rmtree(installed_root)
     shutil.copytree(preview["path"], installed_root)
@@ -1231,7 +1370,7 @@ def install_agent_pack(path_value: str, *, overwrite: bool = False) -> dict[str,
             "version": preview["version"],
             "type": preview["type"],
             "description": preview["description"],
-            "source_path": preview["path"],
+            "source_path": source_label or preview["path"],
             "installed_path": str(installed_root),
             "installed_agents": installed_agent_names,
             "installed_tools": [item["name"] for item in preview["tools"]],
@@ -1294,9 +1433,13 @@ def export_agent_pack(
 ) -> dict[str, Any]:
     """Mevcut kurulumdan kurulabilir bir agent pack uretir (install_agent_pack'in tersi).
 
-    Sadece config tipi ajanlar ve custom tool'lar paketlenebilir: builtin ajanlar
-    kod icinde yasar, builtin tool'lar zaten hedef kurulumda vardir. Env
-    degerleri ASLA pakete yazilmaz; sadece degisken adlari env.example'a girer.
+    Config tipi ajanlar, custom tool'lar VE builtin ajanlar paketlenebilir.
+    Scaffold edilmis builtin'lerin (Agent Studio ile /agent create --builtin
+    uretilmis) .py kaynagi pakete gomulur ve hedefte henuz yoksa kurulur.
+    Repoyla gelen orijinal builtin'ler (sosyal_medya_agent, content_creator_agent,
+    ...) sadece config olarak tasinir -- kaynagi gomulmez, hedefte zaten var
+    olmasi beklenir. Builtin tool'lar zaten her kurulumda var, pakete girmez.
+    Env degerleri ASLA pakete yazilmaz; sadece degisken adlari env.example'a girer.
     """
     ensure_agent_studio_files()
     pack_name = validate_pack_name(name)
@@ -1306,22 +1449,20 @@ def export_agent_pack(
     custom_entries = {item["name"]: item for item in load_custom_tools_config()["custom_tools"]}
 
     # --- ajan secimi ---
+    # Not: builtin ajanlar da paketlenebilir. Scaffold edilmis (Agent Studio ile
+    # /agent create --builtin ile uretilmis) builtin'lerin .py kaynagi pakete
+    # gömülür, boylece hedef kurulumda henuz yoksa bile kurulabilir. Repoyla
+    # birlikte gelen orijinal 6 builtin (sosyal_medya_agent, content_creator_agent, ...)
+    # icin kaynak gömülmez -- hedefin zaten AYNI Ethgent kod tabanina sahip olmasi
+    # beklenir; sadece config (model/tool/prompt) tasinir.
     if include_all and not agents:
-        selected_agents = [item for item in agent_entries.values() if item.get("type") == "config"]
-        skipped_builtin = [item["name"] for item in agent_entries.values() if item.get("type") != "config"]
-        if skipped_builtin:
-            warnings.append(f"Builtin ajanlar paketlenemez, atlandi: {', '.join(sorted(skipped_builtin))}")
+        selected_agents = list(agent_entries.values())
     else:
         selected_agents = []
         for agent_name in agents or []:
             entry = agent_entries.get(validate_agent_name(agent_name))
             if entry is None:
                 raise AgentStudioError(f"Ajan bulunamadi: {agent_name}")
-            if entry.get("type") != "config":
-                raise AgentStudioError(
-                    f"'{agent_name}' builtin tipinde ve paketlenemez. Once '/agent copy {agent_name} <yeni_ad>' "
-                    "ile config kopyasini olustur, sonra onu paketle."
-                )
             selected_agents.append(entry)
 
     # --- tool secimi ---
@@ -1392,20 +1533,33 @@ def export_agent_pack(
             }
         )
 
-    # --- ajan manifestleri ve promptlar ---
+    # --- ajan manifestleri, promptlar ve (varsa) builtin submodel kaynagi ---
     manifest_agents = []
     if selected_agents:
         (root / "agents").mkdir()
     for agent in selected_agents:
+        is_builtin = agent.get("type") == "builtin"
         payload = {
             "name": agent["name"],
-            "type": "config",
+            "type": "builtin" if is_builtin else "config",
             "enabled": bool(agent.get("enabled", True)),
             "description": agent.get("description") or "",
             "model": agent.get("model") or "default",
             "tool_mode": agent.get("tool_mode") or "custom",
             "tools": list(agent.get("tools") or []),
         }
+        if is_builtin and _is_scaffolded_builtin_agent(agent["name"]):
+            source = _builtin_module_path(agent["name"])
+            if not source.exists():
+                raise AgentStudioError(f"{agent['name']} icin builtin submodel dosyasi bulunamadi: {source}")
+            (root / "submodels").mkdir(exist_ok=True)
+            shutil.copy2(source, root / "submodels" / f"{agent['name']}.py")
+            payload["submodel_file"] = f"submodels/{agent['name']}.py"
+        elif is_builtin:
+            warnings.append(
+                f"{agent['name']} bu Ethgent kod tabanina gomulu bir builtin; sadece ayni kod tabanina "
+                "sahip baska bir kuruluma tasinabilir (Python kaynagi pakete girmedi)."
+            )
         prompt = str(agent.get("system_prompt") or "").strip()
         if prompt:
             (root / "prompts").mkdir(exist_ok=True)

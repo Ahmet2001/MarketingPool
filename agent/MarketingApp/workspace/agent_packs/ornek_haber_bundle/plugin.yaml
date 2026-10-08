@@ -1,0 +1,12 @@
+name: ornek_haber_bundle
+version: 0.1.0
+type: agent_bundle
+description: Basit bir haber toplama tool'u ve bunu kullanan config agent ornegi.
+tools:
+  - name: haber_basliklarini_say
+    file: tools/haber_basliklarini_say.py
+    description: Verilen haber basliklarini sayar ve en cok tekrar eden kelimeleri ozetler.
+    params_note: '{"titles": ["Bitcoin ETF onayi geldi", "Ethereum ETF beklentisi artti"]}'
+    env_vars: []
+agents:
+  - agents/haber_izleyici.yaml

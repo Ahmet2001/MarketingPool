@@ -19,7 +19,7 @@ except BaseException as pyautogui_import_error:
 
 from MarketingApp.paths import workspace_path
 
-# Workspace dizini (varsayilan: proje kok dizini; MIMAR_WORKSPACE_DIR ile override edilebilir)
+# Workspace dizini (varsayilan: proje kok dizini; ETHGENT_WORKSPACE_DIR ile override edilebilir)
 _WORKSPACE_SCREENSHOTS = workspace_path("screenshots")
 
 # Global bot instance (tg_bot.py tarafından set edilir)

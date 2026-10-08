@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from typing import Optional, Callable, Awaitable
 from datetime import datetime
 
+from MarketingApp import telemetry
+
 
 @dataclass
 class KanalMesaji:
@@ -62,6 +64,8 @@ async def mesaj_isle(mesaj: KanalMesaji, base_model) -> KanalYaniti:
     Returns:
         KanalYaniti
     """
+    telemetry.set_source(mesaj.kaynak)  # LLM kullanimi dogru kanala yazilsin
+
     collected_direct = []
     collected_cevap = []
 

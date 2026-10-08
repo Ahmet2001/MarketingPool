@@ -10,7 +10,7 @@ from datetime import datetime
 
 from MarketingApp.paths import WORKSPACE_DIR as _WORKSPACE_DIR
 
-# Workspace dizini (varsayilan: proje kok dizini; MIMAR_WORKSPACE_DIR ile override edilebilir)
+# Workspace dizini (varsayilan: proje kok dizini; ETHGENT_WORKSPACE_DIR ile override edilebilir)
 WORKSPACE_DIR = str(_WORKSPACE_DIR)
 
 

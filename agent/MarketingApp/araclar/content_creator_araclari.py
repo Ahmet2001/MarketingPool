@@ -884,7 +884,7 @@ def _render_video_to_mp4(
         "subtitle": artifact_dir / "subtitle.txt",
         "cta": artifact_dir / "cta.txt",
     }
-    text_files["brand"].write_text(_wrap_overlay_text(brand or "Mimar", 28, 1), encoding="utf-8")
+    text_files["brand"].write_text(_wrap_overlay_text(brand or "Ethgent", 28, 1), encoding="utf-8")
     text_files["platform"].write_text(_wrap_overlay_text((platform or "SOCIAL").upper(), 24, 1), encoding="utf-8")
     text_files["title"].write_text(_wrap_overlay_text(title or "Sosyal Video", title_max_chars, 3), encoding="utf-8")
     text_files["subtitle"].write_text(_wrap_overlay_text(subtitle, subtitle_max_chars, 3), encoding="utf-8")
@@ -981,7 +981,7 @@ def _build_post_html(
     title_html = html.escape(title.strip() or "Dikkat Cekici Post")
     subtitle_html = html.escape(subtitle.strip())
     cta_html = html.escape(cta.strip())
-    brand_html = html.escape(brand.strip() or "Mimar")
+    brand_html = html.escape(brand.strip() or "Ethgent")
     note_html = html.escape(note.strip())
     platform_html = html.escape(platform.strip().upper() or "SOCIAL")
     credit_html = html.escape(f"Photo: {photographer} / Pexels" if photographer else "Photo: Pexels")
@@ -1480,7 +1480,7 @@ def video_post_olustur_ve_mp4_kaydet(
     genislik: int = 1080,
     yukseklik: int = 1920,
     sure_saniye: int = 8,
-    marka: str = "Mimar",
+    marka: str = "Ethgent",
     vurgu_rengi: str = "#00F0FF",
     ikincil_renk: str = "#F7931A",
     cikti_adi: str = "",
@@ -1652,7 +1652,7 @@ def html_css_post_olustur_ve_png_kaydet(
     genislik: int = 1600,
     yukseklik: int = 900,
     tema: str = "dark",
-    marka: str = "Mimar",
+    marka: str = "Ethgent",
     vurgu_rengi: str = "#F7931A",
     ikincil_renk: str = "#00F0FF",
     ek_not: str = "",

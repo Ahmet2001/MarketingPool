@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from .base import SubModel, register_submodel
+from MarketingApp import telemetry
 from MarketingApp.araclar import VLM_ARACLARI, get_screenshot_bytes
 
 load_dotenv()
@@ -90,6 +91,7 @@ class VLMAgentSubModel(SubModel):
 
         # Varsayılan yanıt artık "belirsiz" — model açıkça "yaptım" demeli
         final_response = "[VLM Agent görevi işledi ancak açık bir sonuç bildirmedi]"
+        tracker = telemetry.LiveUsageTracker(self.name, self.model_id)
         try:
             # 2. ADIM: Live Bağlantısı ve Tek Seferlik Multimodal Gönderim
             async with self._client.aio.live.connect(
@@ -127,6 +129,7 @@ class VLMAgentSubModel(SubModel):
                 son_aksiyon_args = None
                 
                 async for message in session.receive():
+                    tracker.observe(message)
                     if message.server_content and message.server_content.model_turn:
                         for part in message.server_content.model_turn.parts:
                             if part.text:
@@ -234,6 +237,8 @@ class VLMAgentSubModel(SubModel):
         except Exception as e:
             print(f"  ❌ [{self.name}] Live API Hatası: {e}")
             return f"VLM Hatası: {e}"
+        finally:
+            tracker.flush()
 
         print(f"  ✅ [{self.name}] Görev tamamlandı.")
         return final_response

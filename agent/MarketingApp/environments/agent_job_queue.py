@@ -8,7 +8,7 @@ SUPABASE_URL/SUPABASE_SECRET_KEY degiskenleri uzerinden calisir (bkz.
 `MarketingApp/araclar/worker_yayinlama_araclari.py`).
 
 Tasarim gerekcesi: bu modul SADECE queue-poller'i besler ve MCP tool'unun
-audit-trail insert'ini yapar; asil is (`MimarAgent.run`) burada degil
+audit-trail insert'ini yapar; asil is (`EthgentAgent.run`) burada degil
 `MarketingApp/worker.py`'de calisir.
 """
 

@@ -55,7 +55,7 @@ async def _run_telegram_safely(token: str, base_model):
 
 
 async def main():
-    print("🚀 Mimar başlatılıyor...")
+    print("🚀 Ethgent başlatılıyor...")
 
     # API anahtarlarını .env'den oku
     TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -70,7 +70,7 @@ async def main():
     # 1. Orkestratör modeli oluştur
     base_model = BaseModel(api_key=MODEL_API_KEY, model=MODEL_NAME)
     
-    base_model.log_message("sistem", "Mimar terminal yonetimi baslatiliyor...")
+    base_model.log_message("sistem", "Ethgent terminal yonetimi baslatiliyor...")
 
     # 2. BaseModel'in doğrudan kullandığı minimal araç setini hazırla
     base_arac_map = {func.__name__: func for func in BASE_ARACLAR}
@@ -126,4 +126,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\nMimar kapatildi.")
+        print("\nEthgent kapatildi.")

@@ -9,6 +9,7 @@ ortam degiskenlerinden okunur.
 from __future__ import annotations
 
 import os
+import re
 
 
 _DEFAULT_PROVIDER = "gemini"
@@ -60,26 +61,59 @@ def get_provider_display_name() -> str:
     return provider.upper()
 
 
+def provider_env_prefix(provider: str) -> str:
+    """Bilinmeyen bir provider adini env degiskeni onekine cevirir (ornek: 'deepseek' -> 'DEEPSEEK')."""
+    normalized = re.sub(r"[^A-Za-z0-9]+", "_", (provider or "").strip()).strip("_").upper()
+    return normalized or "PROVIDER"
+
+
+def provider_api_key_env_name(provider: str | None = None) -> str:
+    """Bu provider icin API anahtarinin okunacagi/yazilacagi ana env degiskeninin adi.
+
+    gemini ve moonshot bilinen/tarihsel isimlerini korur; her yeni provider
+    icin otomatik olarak <PROVIDER>_API_KEY uretilir, boylece provider sayisi
+    kod degisikligi gerektirmeden buyuyebilir.
+    """
+    normalized = (provider or get_model_provider()).strip().lower()
+    if normalized == "gemini":
+        return "GEMINI_API_KEY"
+    if normalized == "moonshot":
+        return "MOONSHOT_API_KEY"
+    return f"{provider_env_prefix(normalized)}_API_KEY"
+
+
 def get_model_api_key() -> str:
     provider = get_model_provider()
     if provider == "gemini":
         return os.getenv("GEMINI_API_KEY") or ""
-    return os.getenv("MOONSHOT_API_KEY") or os.getenv("KIMI_API_KEY") or ""
+    if provider == "moonshot":
+        return os.getenv("MOONSHOT_API_KEY") or os.getenv("KIMI_API_KEY") or ""
+    return (
+        os.getenv("MODEL_API_KEY")
+        or os.getenv(provider_api_key_env_name(provider))
+        or ""
+    )
 
 
 def get_model_api_keys() -> list[str]:
     provider = get_model_provider()
-    raw_keys: list[str] = []
     if provider == "gemini":
         raw_keys = [
             os.getenv("GEMINI_API_KEY") or "",
             os.getenv("GEMINI_API_KEY_SECONDARY") or "",
             os.getenv("GEMINI_API_KEY_FALLBACK") or "",
         ]
-    else:
+    elif provider == "moonshot":
         raw_keys = [
             os.getenv("MOONSHOT_API_KEY") or "",
             os.getenv("KIMI_API_KEY") or "",
+        ]
+    else:
+        prefix = provider_env_prefix(provider)
+        raw_keys = [
+            os.getenv("MODEL_API_KEY") or "",
+            os.getenv(f"{prefix}_API_KEY") or "",
+            os.getenv(f"{prefix}_API_KEY_SECONDARY") or "",
         ]
 
     unique_keys: list[str] = []
@@ -98,7 +132,9 @@ def get_openai_compat_base_url() -> str:
     provider = get_model_provider()
     if provider == "gemini":
         return os.getenv("GEMINI_OPENAI_BASE_URL") or _DEFAULT_GEMINI_BASE_URL
-    return os.getenv("MOONSHOT_BASE_URL") or _DEFAULT_MOONSHOT_BASE_URL
+    if provider == "moonshot":
+        return os.getenv("MOONSHOT_BASE_URL") or _DEFAULT_MOONSHOT_BASE_URL
+    return os.getenv(f"{provider_env_prefix(provider)}_BASE_URL") or ""
 
 
 def get_moonshot_base_url() -> str:

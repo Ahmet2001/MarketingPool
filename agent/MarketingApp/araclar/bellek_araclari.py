@@ -32,6 +32,15 @@ def _kaydet_bellek(data: dict):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def bellek_raw() -> dict:
+    """Uzun vadeli bellegin ham (formatlanmamis) halini dondurur.
+
+    bellek_oku()'nun aksine model tool'u olarak degil, terminal gibi programatik
+    tuketiciler (ornek: /memory search) icin dusunulmustur.
+    """
+    return _yukle_bellek()
+
+
 def bellek_yaz(kategori: str, anahtar: str, deger: str) -> str:
     """
     Kritik bilgileri uzun vadeli belleğe kaydeder. Bot her zaman hatırlar.

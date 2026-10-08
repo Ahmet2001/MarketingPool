@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "marketingapp"
+name = "ethgent"
 version = "0.1.0"
 description = "AI destekli sosyal medya yonetimi, icerik uretimi ve tarayici otomasyon platformu."
 readme = "README.md"

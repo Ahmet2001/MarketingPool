@@ -1,0 +1,11 @@
+name: haber_izleyici
+type: config
+enabled: false
+description: Haber basliklarini ozetleyip icerik ekibine kisa yon cizen ornek agent.
+model: default
+tool_mode: custom
+tools:
+  - context_paketi_oku
+  - context_aksiyon_kaydet
+  - haber_basliklarini_say
+system_prompt_file: prompts/haber_izleyici.md

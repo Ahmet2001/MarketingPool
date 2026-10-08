@@ -1,4 +1,4 @@
-"""Mimar'i disaridan (baska bir orkestratorden) bir agent olarak kullanmak
+"""Ethgent'i disaridan (baska bir orkestratorden) bir agent olarak kullanmak
 icin ince, yan-etkisiz programatik API.
 
 `python -m MarketingApp.main` (terminal.py) bu projeyi TEK BASINA CALISAN bir
@@ -11,9 +11,9 @@ cagirmasi icin dusunulmustur.
 
 Kullanim:
 
-    from MarketingApp.agent_api import MimarAgent
+    from MarketingApp.agent_api import EthgentAgent
 
-    agent = MimarAgent(
+    agent = EthgentAgent(
         workspace_dir="/path/to/pool/brandX/workspace",
         config_dir="/path/to/pool/brandX/config",  # opsiyonel, verilmezse repo varsayilani
     )
@@ -26,10 +26,10 @@ edildiginde BIR KERE hesaplanir ve tum araclar (browser cookie/profile
 dizinleri, hafiza dosyalari, agent config'i, heartbeat config'i, ...) o
 degeri kullanir. Bu yuzden:
   - Bu process'te `MarketingApp` altindan HERHANGI BIR seyi import etmeden
-    once `MimarAgent(...)` cagrilmalidir (constructor bunu kendisi kontrol
+    once `EthgentAgent(...)` cagrilmalidir (constructor bunu kendisi kontrol
     eder ve gec kalinirsa acik bir hata firlatir).
   - Ayni process icinde FARKLI workspace_dir/config_dir degerleriyle birden
-    fazla `MimarAgent` calistirmak desteklenmez -- bu proje su an tek
+    fazla `EthgentAgent` calistirmak desteklenmez -- bu proje su an tek
     workspace/tek process modeliyle calisir. Coklu pool/coklu marka
     senaryosunda cagiran taraf her workspace icin ayri bir process
     (ör. ayri bir subprocess/worker) baslatmalidir.
@@ -50,7 +50,7 @@ class AgentConfigurationError(RuntimeError):
 
 @dataclass
 class AgentResult:
-    """`MimarAgent.run()` cagrisinin yapilandirilmis sonucu."""
+    """`EthgentAgent.run()` cagrisinin yapilandirilmis sonucu."""
 
     text: str
     """Modelin nihai (kullaniciya gosterilecek) yaniti."""
@@ -71,20 +71,20 @@ def _apply_path_override(env_var: str, value: str | None) -> None:
     if "MarketingApp.paths" in sys.modules:
         from MarketingApp import paths as _paths
 
-        current = str(_paths.WORKSPACE_DIR if env_var == "MIMAR_WORKSPACE_DIR" else _paths.CONFIG_DIR)
+        current = str(_paths.WORKSPACE_DIR if env_var == "ETHGENT_WORKSPACE_DIR" else _paths.CONFIG_DIR)
         if os.path.abspath(current) != os.path.abspath(value):
             raise AgentConfigurationError(
                 f"{env_var} artik degistirilemez: MarketingApp bu process icinde zaten "
                 f"'{current}' degeriyle import edilmis. Farkli bir workspace/config icin "
-                "yeni bir process baslatin (ayni process'te birden fazla MimarAgent "
+                "yeni bir process baslatin (ayni process'te birden fazla EthgentAgent "
                 "farkli dizinlerle desteklenmez)."
             )
         return
     os.environ[env_var] = value
 
 
-class MimarAgent:
-    """Mimar'in BaseModel orkestratorunu yan-etkisiz, programatik olarak sarmalar.
+class EthgentAgent:
+    """Ethgent'in BaseModel orkestratorunu yan-etkisiz, programatik olarak sarmalar.
 
     Terminal/heartbeat/telegram gibi hicbir arka plan gorevi baslatmaz;
     sadece `run()` ile tek seferlik/ardisik gorev cagirmaya yarar.
@@ -99,8 +99,8 @@ class MimarAgent:
         api_key: str | None = None,
         approval_handler: Callable[[str, str], Awaitable[bool]] | None = None,
     ):
-        _apply_path_override("MIMAR_WORKSPACE_DIR", workspace_dir)
-        _apply_path_override("MIMAR_CONFIG_DIR", config_dir)
+        _apply_path_override("ETHGENT_WORKSPACE_DIR", workspace_dir)
+        _apply_path_override("ETHGENT_CONFIG_DIR", config_dir)
 
         # BaseModel (ve onun uzerinden tum araclar/SubModel'lar) burada, path
         # override'lari uygulandiktan SONRA import edilir.
@@ -116,7 +116,7 @@ class MimarAgent:
         self._base_model = _BaseModel(api_key=api_key, model=model)
 
         # BaseModel.__init__ kendi (insan onayi bekleyen, 300sn timeout'lu)
-        # varsayilan handler'ini zaten kaydetti -- ama MimarAgent tanim geregi
+        # varsayilan handler'ini zaten kaydetti -- ama EthgentAgent tanim geregi
         # bassiz (headless) bir baglamdir, onaylayacak kimse yok. Cagiran taraf
         # kendi approval_handler'ini vermezse, gereksiz 300sn beklemek yerine
         # aninda ve acikca reddet (fail-closed). Cagiran taraf ileride kendi

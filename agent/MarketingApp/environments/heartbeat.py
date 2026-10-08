@@ -49,6 +49,7 @@ except Exception:
 
 
 from MarketingApp.paths import config_path, workspace_path
+from MarketingApp import telemetry
 
 _CONFIG_PATH = config_path("heartbeat_config.yaml")
 _RUNTIME_DIR = workspace_path("runtime")
@@ -837,6 +838,12 @@ class HeartbeatService:
         error: str = "",
         duration_ms: int | None = None,
     ) -> None:
+        if status == "skipped":
+            # Calismayan bir tur de 'gece ne oldu?' sorusunun cevabinin parcasi.
+            task = self.task_map.get(job_id)
+            telemetry.record_run(
+                "heartbeat", task.name if task else job_id, status="skipped", job_id=job_id, error=error
+            )
         with self._connect_db() as conn:
             conn.execute(
                 """
@@ -1130,11 +1137,14 @@ class HeartbeatService:
                 force=True,
             )
 
-            result = await self._execute_with_retry(
-                task,
-                trigger_reason=trigger_reason,
-                notify_telegram=notify_telegram,
-            )
+            with telemetry.run_scope("heartbeat", task.name, job_id=job_id, detail=trigger_reason) as run:
+                result = await self._execute_with_retry(
+                    task,
+                    trigger_reason=trigger_reason,
+                    notify_telegram=notify_telegram,
+                )
+                outputs = (result or {}).get("outputs") or []
+                run.set_summary(" | ".join(str(item).strip() for item in outputs if str(item).strip()))
             duration_ms = int((time.monotonic() - start_monotonic) * 1000)
             self._record_job_result(job_id, status="success", duration_ms=duration_ms)
             await self._send_progress_message(
@@ -1190,6 +1200,11 @@ class HeartbeatService:
                     raise
 
                 delay = _RETRY_DELAYS_SECONDS[min(attempt - 1, len(_RETRY_DELAYS_SECONDS) - 1)]
+                telemetry.record_event(
+                    "heartbeat",
+                    f"{task.task_id}: gecici model hatasi ({exc}); {delay}sn sonra yeniden denenecek "
+                    f"(deneme {attempt}/{_MAX_RETRY_ATTEMPTS})",
+                )
                 print(
                     f"⚠️ [Heartbeat] Gecici model hatasi ({exc}), "
                     f"{delay}sn sonra yeniden denenecek."

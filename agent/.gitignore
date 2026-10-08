@@ -1,5 +1,6 @@
 .env
 .env.local
+.env.model
 .env.secrets
 
 .venv/
@@ -17,5 +18,7 @@ MarketingApp/workspace/konusma_gecmisi.json
 MarketingApp/workspace/.system/terminal_chat_history.json
 MarketingApp/workspace/social/x_feed_snapshot.json
 MarketingApp/workspace/social/x_reply_queue.json
+MarketingApp/workspace/social/accounts.json
+MarketingApp/workspace/exports/
 
 .DS_Store

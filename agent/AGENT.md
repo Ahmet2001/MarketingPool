@@ -1,4 +1,4 @@
-# Marketing Agent (Mimar)
+# Marketing Agent (Ethgent)
 
 An OpenAI-compatible, tool-calling orchestrator (`BaseModel`) that delegates
 content-creation, research, and social-operations work to specialized
@@ -69,7 +69,7 @@ the `sosyal_medya_agent` sub-agent:
   **This is not optional to skip:** queuing a job successfully only means
   the row was inserted, not that anything was published. The agent's system
   prompt tells it to check this before logging a publish as successful —
-  without it, the only signal Mimar ever had was its own "✅ queued" message,
+  without it, the only signal Ethgent ever had was its own "✅ queued" message,
   which said nothing about what `social-media-worker` actually did with it.
 
 All three talk to the **same** Supabase project `social-media-worker` already
@@ -77,7 +77,7 @@ polls, authenticated via `SUPABASE_AGENT_KEY` (preferred, scoped) or
 `SUPABASE_SECRET_KEY` (fallback, full service-role) — see "Supabase
 anahtarını daraltma" below.
 
-This gives Mimar a capability it never had before: publishing generated
+This gives Ethgent a capability it never had before: publishing generated
 video/carousel content to Instagram, YouTube, and TikTok (previously it
 could only reach X/Twitter, and only through a local Selenium browser
 session).
@@ -100,13 +100,13 @@ That module is a process-wide registry (same pattern as
 - **Terminal** (`main.py`): `BaseModel` always registers a handler that
   defers to `self.request_approval`, which `TerminalManager` overrides with
   an interactive `y/n` prompt — unchanged behavior, a human approves.
-- **Headless** (`MimarAgent`, and therefore `worker.py` and any other
+- **Headless** (`EthgentAgent`, and therefore `worker.py` and any other
   embedder that doesn't pass its own `approval_handler`): registers
   `reject_all_approvals` by default — every gated action is refused
   immediately and logged, because there is no one to ask. This is
   deliberately fail-closed rather than silently approving or hanging on
   `BaseModel`'s 300-second default wait for an event nothing will ever set.
-  Pass `MimarAgent(approval_handler=...)` to plug in a real approval flow
+  Pass `EthgentAgent(approval_handler=...)` to plug in a real approval flow
   (e.g. a callback into a dashboard) once one exists.
 
 Net effect: today, a risky publish requested through `worker.py` (queue or
@@ -312,7 +312,7 @@ and `platform_veri_topla` says so plainly rather than inventing metrics.
 
 Besides the interactive terminal (`main.py`), this agent can now run
 unattended as a worker: `python -m MarketingApp.worker` (or `./worker.sh`)
-starts one process with **two** entry points sharing a single `MimarAgent`
+starts one process with **two** entry points sharing a single `EthgentAgent`
 instance, serialized through the existing `AutomationCoordinator` so they
 never touch `BaseModel`/the browser session concurrently:
 
@@ -321,7 +321,7 @@ never touch `BaseModel`/the browser session concurrently:
    Supabase project as `publish_jobs`) for `status='queued'` rows, claims one
    at a time (`claim_next_agent_job()`, same skip-locked pattern as
    `social-media-worker`'s `claim_publish_job()`), runs
-   `payload.task`/`payload.context` through `MimarAgent.run()`, and writes
+   `payload.task`/`payload.context` through `EthgentAgent.run()`, and writes
    `results`/`error`/`status` back. Anything — the App, a cron job, a human
    via `psql`/Studio — queues work just by inserting a row; nothing needs to
    import Python to use it.
@@ -344,14 +344,14 @@ want on-demand calls.
 *inside this one process*. Running `worker.py` and `main.py` against the
 same `workspace_dir` at the same time is unsupported — that's the same
 single-process/single-workspace constraint [`agent_api.py`](./MarketingApp/agent_api.py)
-already documents for `MimarAgent`, just restated here because `worker.py`
+already documents for `EthgentAgent`, just restated here because `worker.py`
 is a second thing that constructs one. Pick one per workspace.
 
 ## What deliberately stays out of the worker
 
 Everything the worker has no contract for — liking, following, commenting,
 posting text tweets, scanning notifications, reading feeds — keeps running
-exactly as it did in the standalone Mimar project: through the `browser_*`
+exactly as it did in the standalone Ethgent project: through the `browser_*`
 Selenium tools in `sosyal_medya_agent`, marked `supervised_local_only` in
 spirit (an interactive, signed-in browser session, not something a
 background worker replica should run). Moving these into the worker would
@@ -380,7 +380,7 @@ approval flow is wired up.
 ## Embedding
 
 [`MarketingApp/agent_api.py`](./MarketingApp/agent_api.py) exposes a
-side-effect-free `MimarAgent` class (no heartbeat/Telegram/Discord
+side-effect-free `EthgentAgent` class (no heartbeat/Telegram/Discord
 auto-start) for calling this agent programmatically from another
 orchestrator, with an injectable workspace/config directory. See its
 module docstring for the single-process-per-workspace caveat. It also

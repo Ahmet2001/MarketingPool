@@ -7,7 +7,7 @@ agents:
   enabled: true
   description: X, Instagram ve YouTube uzerinde yayinlama, etkilesim, bildirim tarama
     ve sosyal operasyon ajani.
-  model: gemma-4-26b-a4b-it
+  model: default
   tool_mode: custom
   system_prompt: ''
   tools:
@@ -72,7 +72,7 @@ agents:
   enabled: true
   description: Caption, medya arama, website icerigi, HTML/CSS PNG post ve MP4 video
     uretim ajani.
-  model: gemma-4-26b-a4b-it
+  model: default
   tool_mode: default
   system_prompt: ''
   tools: []
@@ -80,7 +80,7 @@ agents:
   type: builtin
   enabled: false
   description: Selenium tabanli web gezinme, DOM okuma ve form etkilesimi ajani.
-  model: gemma-4-26b-a4b-it
+  model: browser_default
   tool_mode: default
   system_prompt: ''
   tools: []
@@ -106,7 +106,7 @@ agents:
   type: builtin
   enabled: false
   description: Bilgisyarla ilgili bi iş yapılması gerektiinde
-  model: gemma-4-26b-a4b-it
+  model: default
   tool_mode: custom
   system_prompt: ''
   tools:

@@ -1,13 +1,13 @@
 """
-MarketingApp Worker — Mimar'i "worker" olarak calistiran giris noktasi.
+MarketingApp Worker — Ethgent'i "worker" olarak calistiran giris noktasi.
 
-`python -m MarketingApp.main` (terminal.py) Mimar'i interaktif bir insan
+`python -m MarketingApp.main` (terminal.py) Ethgent'i interaktif bir insan
 oturumu olarak ayaga kaldirir. Bu modul onun yaninda, insansiz calisan iki
 farkli giris noktasini BIRLIKTE baslatir:
 
   1. Queue-poller: `agent_jobs` Supabase tablosunu (bkz.
      migrations/001_agent_jobs.sql) periyodik olarak yoklar, 'queued'
-     satirlari claim edip MimarAgent.run() ile isler, sonucu tabloya yazar.
+     satirlari claim edip EthgentAgent.run() ile isler, sonucu tabloya yazar.
      App / scheduler_worker / baska bir sistem sadece satir eklemekle gorevi
      kuyruga atmis olur — social-media-worker'in publish_jobs'u nasil
      calisiyorsa aynen oyle (ayni Supabase projesi, SUPABASE_URL /
@@ -16,7 +16,7 @@ farkli giris noktasini BIRLIKTE baslatir:
      ve auth deseniyle (Authorization: Bearer <AGENT_WORKER_MCP_TOKEN>) ayni
      ajani senkron/on-demand cagirmak isteyen herhangi bir MCP client'a acar.
 
-Ikisi de AYNI tek MimarAgent ornegini paylasir (agent_api.py'nin "tek
+Ikisi de AYNI tek EthgentAgent ornegini paylasir (agent_api.py'nin "tek
 process / tek workspace" kisitiyla tutarli) ve AutomationCoordinator ile
 serilestirilir — boylece queue-poller ile MCP cagrisi ayni anda
 BaseModel/browser oturumuna dokunamaz.
@@ -50,7 +50,7 @@ load_dotenv(dotenv_path=os.path.join(_PROJECT_ROOT, ".env.local"), override=True
 load_dotenv(dotenv_path=os.path.join(_PROJECT_ROOT, ".env.model"), override=True)
 load_dotenv(dotenv_path=os.path.join(_PROJECT_ROOT, ".env.secrets"), override=True)
 
-from MarketingApp.agent_api import MimarAgent
+from MarketingApp.agent_api import EthgentAgent
 from MarketingApp.environments import agent_job_queue
 from MarketingApp.environments.agent_mcp_server import AgentMcpServer, build_auth_app
 from MarketingApp.environments.automation_runtime import (
@@ -78,7 +78,7 @@ def _agent_result_to_dict(result) -> dict:
 
 
 async def _execute_task(
-    mimar_agent: MimarAgent,
+    ethgent_agent: EthgentAgent,
     task: str,
     context: str,
     *,
@@ -95,19 +95,19 @@ async def _execute_task(
         busy_label = snapshot.get("label") or snapshot.get("job_id") or "aktif gorev"
         raise AutomationBusyError(f"Otomasyon mesgul: {busy_owner} / {busy_label}")
     try:
-        result = await mimar_agent.run(task, context=context)
+        result = await ethgent_agent.run(task, context=context)
         return _agent_result_to_dict(result)
     finally:
         await release_automation(owner, job_id=job_id)
 
 
-async def _execute_task_with_busy_retry(mimar_agent: MimarAgent, task: str, context: str, *, job_id: str, label: str) -> dict:
+async def _execute_task_with_busy_retry(ethgent_agent: EthgentAgent, task: str, context: str, *, job_id: str, label: str) -> dict:
     """Queue-poller icin: MCP cagrisi mesgulse birkac kez kisa aralikla yeniden dener."""
     last_exc: Exception | None = None
     for attempt in range(1, _BUSY_RETRY_ATTEMPTS + 1):
         try:
             return await _execute_task(
-                mimar_agent, task, context, owner="agent_worker_queue", job_id=job_id, label=label
+                ethgent_agent, task, context, owner="agent_worker_queue", job_id=job_id, label=label
             )
         except AutomationBusyError as exc:
             last_exc = exc
@@ -116,7 +116,7 @@ async def _execute_task_with_busy_retry(mimar_agent: MimarAgent, task: str, cont
     raise last_exc  # type: ignore[misc]
 
 
-async def _queue_poll_loop(mimar_agent: MimarAgent, poll_ms: int) -> None:
+async def _queue_poll_loop(ethgent_agent: EthgentAgent, poll_ms: int) -> None:
     if not agent_job_queue.is_configured():
         print("ℹ️ [Worker] SUPABASE_URL/SUPABASE_SECRET_KEY tanimsiz; agent_jobs kuyrugu dinlenmiyor.")
         return
@@ -145,7 +145,7 @@ async def _queue_poll_loop(mimar_agent: MimarAgent, poll_ms: int) -> None:
             continue
 
         try:
-            result = await _execute_task_with_busy_retry(mimar_agent, task, context, job_id=job_id, label=owner_ref)
+            result = await _execute_task_with_busy_retry(ethgent_agent, task, context, job_id=job_id, label=owner_ref)
             await asyncio.to_thread(agent_job_queue.finish_agent_job, job_id, result)
             print(f"✅ [Worker] Is tamamlandi: {job_id}")
         except AutomationBusyError as exc:
@@ -158,7 +158,7 @@ async def _queue_poll_loop(mimar_agent: MimarAgent, poll_ms: int) -> None:
             print(f"❌ [Worker] Is hatasi: {job_id} -> {exc}")
 
 
-def _build_mcp_run_task(mimar_agent: MimarAgent):
+def _build_mcp_run_task(ethgent_agent: EthgentAgent):
     async def _mcp_run_task(task: str, context: str) -> dict:
         job_row = None
         if agent_job_queue.is_configured():
@@ -180,7 +180,7 @@ def _build_mcp_run_task(mimar_agent: MimarAgent):
         job_id = str(job_row.get("id")) if job_row else ""
         try:
             result = await _execute_task(
-                mimar_agent, task, context, owner="agent_worker_mcp", job_id=job_id, label=task[:80]
+                ethgent_agent, task, context, owner="agent_worker_mcp", job_id=job_id, label=task[:80]
             )
         except Exception as exc:
             if job_row:
@@ -194,8 +194,8 @@ def _build_mcp_run_task(mimar_agent: MimarAgent):
     return _mcp_run_task
 
 
-async def _run_mcp_server(mimar_agent: MimarAgent, host: str, port: int, token: str) -> None:
-    mcp_server = AgentMcpServer(_build_mcp_run_task(mimar_agent))
+async def _run_mcp_server(ethgent_agent: EthgentAgent, host: str, port: int, token: str) -> None:
+    mcp_server = AgentMcpServer(_build_mcp_run_task(ethgent_agent))
     app = build_auth_app(mcp_server.asgi_app(), token)
 
     if not token:
@@ -208,9 +208,9 @@ async def _run_mcp_server(mimar_agent: MimarAgent, host: str, port: int, token: 
 
 
 async def main() -> None:
-    print("🚀 [Worker] Mimar worker baslatiliyor...")
+    print("🚀 [Worker] Ethgent worker baslatiliyor...")
 
-    mimar_agent = MimarAgent()
+    ethgent_agent = EthgentAgent()
 
     poll_ms = max(1000, int(os.getenv("AGENT_WORKER_POLL_MS") or _DEFAULT_POLL_MS))
     mcp_host = os.getenv("AGENT_WORKER_MCP_HOST") or _DEFAULT_MCP_HOST
@@ -218,8 +218,8 @@ async def main() -> None:
     mcp_token = (os.getenv("AGENT_WORKER_MCP_TOKEN") or "").strip()
 
     tasks = [
-        asyncio.create_task(_queue_poll_loop(mimar_agent, poll_ms), name="agent-worker-queue"),
-        asyncio.create_task(_run_mcp_server(mimar_agent, mcp_host, mcp_port, mcp_token), name="agent-worker-mcp"),
+        asyncio.create_task(_queue_poll_loop(ethgent_agent, poll_ms), name="agent-worker-queue"),
+        asyncio.create_task(_run_mcp_server(ethgent_agent, mcp_host, mcp_port, mcp_token), name="agent-worker-mcp"),
     ]
 
     try:

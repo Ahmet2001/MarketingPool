@@ -16,7 +16,7 @@ Onemli sinirlar:
     "App" katmaninin sorumlulugu (bkz. future_work.md sorumluluk tablosu).
   - Bu araclar SADECE video/carousel yayinlamayi kapsar. Begeni, takip,
     yorum, tweet atma gibi islemler worker'da karsiligi olmadigi icin
-    Mimar'in kendi browser tabanli sosyal medya araclarinda (supervised
+    Ethgent'in kendi browser tabanli sosyal medya araclarinda (supervised
     local) kalmaya devam eder.
   - Gercek bir yayin (`worker_video_yayinla`/`worker_instagram_carousel_yayinla`)
     kuyruga girmeden once `environments.approval_runtime.request_tool_approval`

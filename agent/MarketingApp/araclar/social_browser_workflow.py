@@ -927,7 +927,7 @@ def _collect_x_articles(limit: int = 20) -> list[dict[str, Any]]:
     const articles = [...document.querySelectorAll('article[data-testid="tweet"]')];
 
     for (const [index, article] of articles.entries()) {
-        article.setAttribute('data-mimar-social-id', String(index));
+        article.setAttribute('data-ethgent-social-id', String(index));
 
         const statusLink = [...article.querySelectorAll('a[href*="/status/"]')]
             .map((a) => a.getAttribute('href') || '')

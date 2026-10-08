@@ -29,12 +29,38 @@ except ImportError:
     print("⚠️ [Discord] discord.py yüklü değil. 'pip install discord.py' ile yükleyin.")
 
 from MarketingApp.environments.kanal_router import KanalMesaji, mesaj_isle, kanal_kaydet
+from MarketingApp import telemetry
+from MarketingApp.environments import access, remote_commands
 
 
 # ─── Bot Değişkenleri ────────────────────────────────────────────────────────
 
 _base_model = None
 _bot = None
+_DISCORD_MESSAGE_LIMIT = 1900  # 2000 sinirindan kod blogu cercevesi icin pay birakir
+
+
+async def _handle_admin_command(message) -> bool:
+    """!agent, !tool, !heartbeat, !usage ... Yalnizca DISCORD_ADMIN_IDS. Islendiyse True doner."""
+    content = (message.content or "").strip()
+    if not content.startswith("!") or len(content) < 2:
+        return False
+    command = "/" + content[1:].split(None, 1)[0].lower()
+    if command not in remote_commands.REMOTE_COMMANDS:
+        return False
+
+    user_id = message.author.id
+    if not access.is_admin("discord", user_id):
+        telemetry.record_event("remote", f"discord:{user_id} yonetim komutu denedi (admin degil): {content[:120]}")
+        await message.channel.send("Bu komut icin yetkin yok.")
+        return True
+
+    output = await remote_commands.run_remote_command(
+        _base_model, "/" + content[1:], channel="discord", actor=user_id
+    )
+    for part in remote_commands.split_message(output, _DISCORD_MESSAGE_LIMIT):
+        await message.channel.send("```\n" + part.replace("```", "'''") + "\n```")
+    return True
 
 
 def init_discord_env(base_model):
@@ -71,6 +97,9 @@ async def run_discord_bot(token: str, base_model=None):
     bot = commands.Bot(command_prefix="!", intents=intents)
     _bot = bot
 
+    for warning in access.startup_warnings("discord"):
+        print(f"⚠️ [Discord] {warning}")
+
     # ─── Discord gönderici fonksiyonunu router'a kaydet ──────────────────
     async def discord_gonder(kullanici_id: str, metin: str):
         """Discord kanalına mesaj gönderir."""
@@ -96,6 +125,20 @@ async def run_discord_bot(token: str, base_model=None):
     async def on_message(message):
         # Kendine gelen mesajları yoksay
         if message.author == bot.user:
+            return
+
+        # /id herkese acik: kullanici kendi ID'sini ogrenip allowlist'e ekleyebilsin
+        if (message.content or "").strip().lower() == "!id":
+            await message.channel.send(f"Discord kullanici ID'n: {message.author.id}")
+            return
+
+        # Yetki: DISCORD_ALLOWED_USER_IDS tanimliysa disindakiler sessizce yok sayilir
+        if not access.is_allowed("discord", message.author.id):
+            telemetry.record_event("remote", f"discord:{message.author.id} yetkisiz erisim engellendi")
+            return
+
+        # Yonetim komutlari (!agent, !usage ...): yalnizca DISCORD_ADMIN_IDS
+        if await _handle_admin_command(message):
             return
 
         # Prefix komutlarını işle
@@ -187,7 +230,7 @@ async def run_discord_bot(token: str, base_model=None):
         submodels = list_submodels()
         sm_list = "\n".join([f"• `{name}` — {desc[:60]}..." for name, desc in submodels.items()])
         await ctx.send(
-            f"🤖 **Mimar AI — Discord**\n\n"
+            f"🤖 **Ethgent AI — Discord**\n\n"
             f"**Uzman Ajanlar:**\n{sm_list}\n\n"
             f"💡 Doğal dille mesaj yazarak her şeyi yapabilirsiniz!\n"
             f"**Komutlar:** `!durum` `!yardim`"

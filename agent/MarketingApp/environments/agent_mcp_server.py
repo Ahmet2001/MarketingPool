@@ -1,8 +1,8 @@
 """
-Agent MCP Server — MimarAgent'i istek/yanit (on-demand) olarak disariya acan
+Agent MCP Server — EthgentAgent'i istek/yanit (on-demand) olarak disariya acan
 Streamable HTTP MCP sunucusu. `mcp_worker` ile ayni protokol/transport'u
 (POST /mcp, `Authorization: Bearer <token>`) kullanir, ama Kara Tahta yerine
-dogrudan bu ajani (Mimar) calistirir.
+dogrudan bu ajani (Ethgent) calistirir.
 
 Uzun surebilecek gorevler icin (orn. browser_agent tool'u sinirsiz suredir,
 bkz. BaseModel._get_tool_timeout_seconds) `mcp_worker`'in
@@ -41,7 +41,7 @@ class _TrackedJob:
 
 
 class AgentMcpServer:
-    """MimarAgent'i saran, tool cagrilarini calistiran MCP sunucusu."""
+    """EthgentAgent'i saran, tool cagrilarini calistiran MCP sunucusu."""
 
     def __init__(self, run_task: RunTaskFn):
         """
@@ -56,7 +56,7 @@ class AgentMcpServer:
         self.server = MCPServer(
             name="marketing-agent-worker",
             instructions=(
-                "Mimar marketing-agent'ini gorev/gorev+baglam olarak calistirir. "
+                "Ethgent marketing-agent'ini gorev/gorev+baglam olarak calistirir. "
                 "run_marketing_task ile bir gorev baslat; hemen bitmezse donen "
                 "jobId ile check_marketing_task kullanarak sonucu sorgula."
             ),
@@ -67,7 +67,7 @@ class AgentMcpServer:
         @self.server.tool()
         async def run_marketing_task(task: str, context: str = "") -> dict[str, Any]:
             """
-            Mimar marketing-agent'ine dogal dilde bir gorev gonderir ve calistirir.
+            Ethgent marketing-agent'ine dogal dilde bir gorev gonderir ve calistirir.
             Kisa gorevlerde dogrudan sonucu (status: done) dondurur; gorev
             AGENT_WORKER_WAIT_MS (varsayilan 45sn) icinde bitmezse
             {status: "running", jobId} doner ve gorev arka planda calismaya

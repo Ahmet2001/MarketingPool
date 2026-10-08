@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 
 from openai import AsyncOpenAI
 
+from MarketingApp import telemetry
+
 
 AUTO_CONTEXT_LOG_TOOLS = {
     "save_x_market_snapshot",
@@ -237,7 +239,9 @@ class SubModel(ABC):
 
         for attempt in range(attempts):
             try:
-                return await self._client.chat.completions.create(**create_kwargs)
+                response = await self._client.chat.completions.create(**create_kwargs)
+                telemetry.record_usage(self.name, self.model_id, getattr(response, "usage", None))
+                return response
             except Exception as exc:
                 last_exc = exc
                 can_retry = attempt < attempts - 1 and self._is_retryable_provider_error(exc)

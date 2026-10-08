@@ -1,1 +1,1 @@
-"""Mimar — AI destekli sosyal medya ve pazarlama otomasyon platformu."""
+"""Ethgent — AI destekli sosyal medya ve pazarlama otomasyon platformu."""
