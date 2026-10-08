@@ -1,0 +1,89 @@
+name: youtube-toolbox
+version: 0.1.0
+runtime: python
+entrypoint: api/toolbox.py
+browser_entrypoint: browser/toolbox.py
+legacy_source: legacy_combined_toolbox.py
+platform: youtube
+required_env:
+  - YOUTUBE_CLIENT_ID
+  - YOUTUBE_CLIENT_SECRET
+  - YOUTUBE_REFRESH_TOKEN
+optional_read_env:
+  - YOUTUBE_API_KEY
+oauth_scopes:
+  - https://www.googleapis.com/auth/youtube
+  - https://www.googleapis.com/auth/youtube.force-ssl
+  - https://www.googleapis.com/auth/yt-analytics.readonly
+rate_limit_note: Respect YouTube Data API quota units and Analytics API reporting availability.
+actions:
+  api:
+    production_eligible: true
+    function_prefixes: [get_youtube_api_, search_youtube_api_, comment_youtube_api_, reply_youtube_api_, update_youtube_api_, delete_youtube_api_, rate_youtube_api_, subscribe_youtube_api_, unsubscribe_youtube_api_, create_youtube_api_, add_youtube_api_, upload_youtube_api_, set_youtube_api_thumbnail]
+    writes_external_state: true
+  browser:
+    supervised_local_only: true
+    function_prefixes: [launch_youtube_browser, open_youtube_page, publish_youtube_video, comment_youtube_video, subscribe_youtube_channel, like_youtube_video]
+    writes_external_state: true
+data_collection:
+  # Read-only actions the platform-data worker (../platform_data_worker) may run for
+  # the agent. This is an ALLOWLIST: an action or param that is not listed here is
+  # refused, and only get_/search_/list_ functions may ever be named. `function`
+  # is looked up in api/toolbox.py; params not declared below are rejected, so the
+  # toolbox's `fields`/`part`/`user_id` style knobs stay at their defaults
+  # (own account, default field set). personal_data marks actions whose result
+  # contains other people's content (comment authors and text).
+  actions:
+    channels:
+      function: get_youtube_api_channels
+      description: Channel statistics and metadata by id, handle, or the authenticated owner.
+      rate_limit_per_hour: 60
+      require_one_of: [channel_id, handle, mine]
+      params:
+        channel_id: {type: string, max_length: 64, pattern: '^[A-Za-z0-9_-]+$'}
+        handle: {type: string, max_length: 64, pattern: '^@?[A-Za-z0-9._-]+$'}
+        mine: {type: boolean}
+    videos:
+      function: get_youtube_api_videos
+      description: Metadata and statistics for up to 50 comma-separated video ids or URLs.
+      rate_limit_per_hour: 120
+      params:
+        video_ids: {type: string, required: true, max_length: 1000}
+    playlist_items:
+      function: get_youtube_api_playlist_items
+      description: Videos in a playlist.
+      rate_limit_per_hour: 120
+      params:
+        playlist_id: {type: string, required: true, max_length: 64, pattern: '^[A-Za-z0-9_-]+$'}
+        max_results: {type: integer, minimum: 1, maximum: 50}
+        page_token: {type: string, max_length: 200}
+    comment_threads:
+      function: get_youtube_api_comment_threads
+      description: Top-level comments (with embedded replies) on a video.
+      personal_data: true
+      rate_limit_per_hour: 60
+      params:
+        video_id_or_url: {type: string, required: true, max_length: 200}
+        max_results: {type: integer, minimum: 1, maximum: 100}
+        page_token: {type: string, max_length: 200}
+        order: {type: string, enum: [time, relevance]}
+    analytics:
+      function: get_youtube_api_analytics
+      description: Channel analytics report for the authenticated owner over a date range.
+      rate_limit_per_hour: 60
+      params:
+        start_date: {type: string, required: true, pattern: '^\d{4}-\d{2}-\d{2}$'}
+        end_date: {type: string, required: true, pattern: '^\d{4}-\d{2}-\d{2}$'}
+        metrics: {type: string, max_length: 200, pattern: '^[A-Za-z,]+$'}
+        dimensions: {type: string, max_length: 100, pattern: '^[A-Za-z,]*$'}
+        max_results: {type: integer, minimum: 1, maximum: 200}
+    search:
+      function: search_youtube_api
+      description: Public search for videos, channels, or playlists.
+      rate_limit_per_hour: 30
+      params:
+        query: {type: string, required: true, max_length: 200}
+        resource_type: {type: string, enum: [video, channel, playlist]}
+        max_results: {type: integer, minimum: 1, maximum: 50}
+        order: {type: string, enum: [date, rating, relevance, title, videoCount, viewCount]}
+        published_after: {type: string, max_length: 40}

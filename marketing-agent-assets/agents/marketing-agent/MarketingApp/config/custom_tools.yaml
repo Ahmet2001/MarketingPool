@@ -1,0 +1,30 @@
+version: 1
+custom_tools:
+- name: metin_ozetle
+  enabled: true
+  description: Verilen metni belirlediğiniz uzunlukta (kelime sayısı bazlı) özetler.
+  file: metin_ozetle.py
+  params_note: '{"metin": "Özetlenecek uzun metin", "kelime_sayisi": "Hedeflenen kelime
+    sayısı (opsiyonel, varsayılan 20)"}'
+  env_vars: []
+- name: haber_getir
+  enabled: true
+  description: Belirtilen kategori veya anahtar kelimeye göre son dakika haber başlıklarını
+    getirir.
+  file: haber_getir.py
+  params_note: '{"konu": "teknoloji", "adet": 5}'
+  env_vars: []
+- name: eposta_ozetle
+  enabled: true
+  description: Verilen e-posta içeriğini analiz ederek kısa ve öz bir özet çıkartır.
+  file: eposta_ozetle.py
+  params_note: '{"eposta_metni": "Özetlenecek e-posta içeriği (string)"}'
+  env_vars:
+  - OPENAI_API_KEY
+- name: sistem_durum_monitor
+  enabled: true
+  description: Linux sistemindeki CPU, RAM sıcaklık ve kullanım verilerini anlık olarak
+    döndürür.
+  file: sistem_durum_monitor.py
+  params_note: '{"detayli": "bool (true ise detaylı bilgi, false ise özet bilgi döndürür)"}'
+  env_vars: []

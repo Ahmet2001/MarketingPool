@@ -1,0 +1,140 @@
+## Heartbeat - Crypto X automation
+
+enabled: false
+interval_minutes: 1
+
+post_gorevi: &post_gorevi >
+  Ana post turu.
+  Once `workspace_oku('role.md')`,
+  `workspace_oku('strategies/crypto_x_strategy.md')`,
+  `workspace_oku('strategies/crypto_x_schedule.md')`,
+  `workspace_oku('social/market_state.md')`,
+  `workspace_oku('social/idea_pool.md')` ve
+  `workspace_sonunu_oku('social/recent_actions.md', 6000)` dosyalarini oku.
+  Son 10 aksiyonda fazla tekrarlanmayan taze bir konu sec:
+  Bitcoin, Ethereum, altcoinler, DeFi, NFT, blockchain veya web3.
+  Tek ana fikirli, maksimum 240 karakterlik yeni bir post uret.
+  Ayni kalibi veya ayni aciyi tekrarlama.
+  Uygunsa `publish_x_post(text=...)` ile gonder.
+  Sonucu hem `social/automation_log.md` hem `social/recent_actions.md` dosyalarina kaydet.
+
+tasks:
+  - id: startup_prepare
+    name: Baslangic hazirlik turu
+    cron: "startup"
+    gorev: >
+      Crypto X otomasyonunu hazirla.
+      Once `workspace_oku('role.md')`,
+      `workspace_oku('strategies/crypto_x_strategy.md')`,
+      `workspace_oku('strategies/crypto_x_schedule.md')`,
+      `workspace_oku('social/market_state.md')`,
+      `workspace_oku('social/idea_pool.md')` ve
+      `workspace_sonunu_oku('social/recent_actions.md', 3000)` dosyalarini oku.
+      Sonra `get_browser_status()` ile X oturumu hazir mi kontrol et.
+      Hazirlik ozeti ver; bu turda post, reply veya yorum gonderme.
+
+  - id: market_refresh_20m
+    name: Market refresh turu
+    cron: "*/20"
+    gorev: >
+      Market refresh turu.
+      `save_x_market_snapshot(source='home', limit=12)` aracini cagir.
+      Gerekirse ek baglam icin `snapshot_x_feed(source='explore', limit=8, write_to_file=false)` cagir
+      ama context'i sisirme.
+      Sonra `workspace_oku('social/market_state.md')` ve
+      `workspace_oku('social/idea_pool.md')` dosyalarinin guncellendigini kontrol et.
+      `workspace_ekle('social/automation_log.md', ...)` ile tek satir audit kaydi dus.
+      `workspace_ekle('social/recent_actions.md', ...)` ile kisa bir market refresh kaydi dus.
+
+  - id: outbound_comment_20m
+    name: Dis yorum turu
+    cron: "*/20"
+    gorev: >
+      Outbound comment turu.
+      Once `workspace_oku('role.md')`,
+      `workspace_oku('strategies/crypto_x_strategy.md')`,
+      `workspace_oku('social/market_state.md')`,
+      `workspace_oku('social/idea_pool.md')` ve
+      `workspace_sonunu_oku('social/recent_actions.md', 5000)` dosyalarini oku.
+      Sonra `snapshot_x_feed(source='home', limit=12, write_to_file=false)` ile aday postlari topla.
+      Son 10 aksiyonda hedef alinmamis, konu uyumlu 1 post sec.
+      Maksimum 240 karakterlik, sahici ve tek fikirli 1 yorum yaz.
+      Gerekirse `reply_to_x_post(tweet_url=..., message=...)` kullan.
+      Alakasiz, bos veya tekrara dusen yorumdan kac.
+      Sonucu hem `social/automation_log.md` hem `social/recent_actions.md` dosyalarina kaydet.
+
+  - id: notifications_30m
+    name: Bildirim ve reply turu
+    cron: "*/30"
+    gorev: >
+      Notification ve reply turu.
+      Once `workspace_oku('role.md')`,
+      `workspace_oku('social/market_state.md')`,
+      `workspace_oku('social/idea_pool.md')` ve
+      `workspace_sonunu_oku('social/recent_actions.md', 5000)` dosyalarini oku.
+      Sonra `scan_x_notifications(limit=15, mentions_only=true)` ve `get_x_queue()` araclarini cagir.
+      Statusu `new` olan ve gercek yorum/soru gibi duran kayitlara cevap ver.
+      Her cevap maksimum 240 karakter olsun; kopya kalip kullanma.
+      Spam, anlamsiz mention veya alakasiz icerikleri `mark_queue_item(..., status='skipped', note=...)` ile gec.
+      Uygun olanlari `send_x_reply(queue_id=..., message=...)` ile gonder.
+      Sonucu hem audit loga hem recent actions dosyasina satir olarak ekle.
+
+  - id: post_slot_0905
+    name: Sabah post 1
+    cron: "09:05"
+    gorev: *post_gorevi
+
+  - id: post_slot_1020
+    name: Sabah post 2
+    cron: "10:20"
+    gorev: *post_gorevi
+
+  - id: post_slot_1140
+    name: Sabah post 3
+    cron: "11:40"
+    gorev: *post_gorevi
+
+  - id: post_slot_1300
+    name: Oglen post 1
+    cron: "13:00"
+    gorev: *post_gorevi
+
+  - id: post_slot_1420
+    name: Oglen post 2
+    cron: "14:20"
+    gorev: *post_gorevi
+
+  - id: post_slot_1545
+    name: Oglen post 3
+    cron: "15:45"
+    gorev: *post_gorevi
+
+  - id: post_slot_1705
+    name: Aksamustu post 1
+    cron: "17:05"
+    gorev: *post_gorevi
+
+  - id: post_slot_1830
+    name: Aksamustu post 2
+    cron: "18:30"
+    gorev: *post_gorevi
+
+  - id: post_slot_1950
+    name: Aksam post 1
+    cron: "19:50"
+    gorev: *post_gorevi
+
+  - id: post_slot_2110
+    name: Aksam post 2
+    cron: "21:10"
+    gorev: *post_gorevi
+
+  - id: post_slot_2235
+    name: Gece post 1
+    cron: "22:35"
+    gorev: *post_gorevi
+
+  - id: post_slot_2355
+    name: Gece post 2
+    cron: "23:55"
+    gorev: *post_gorevi

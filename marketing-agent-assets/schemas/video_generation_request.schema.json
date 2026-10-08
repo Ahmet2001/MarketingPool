@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/example/marketing-agent-assets/schemas/video_generation_request.schema.json",
+  "title": "Video Generation Request",
+  "description": "Body of POST {video-requests}. A brief, not a command: the app treats `brief` as opaque descriptive text and decides how (and whether) to render it. Callers should send an Idempotency-Key header; the app should return the existing request for a repeated key instead of starting (and billing) a second render.",
+  "type": "object",
+  "required": ["brief"],
+  "properties": {
+    "brief": { "type": "string", "minLength": 10, "maxLength": 2000 },
+    "title": { "type": "string", "maxLength": 100 },
+    "durationSeconds": { "type": "integer", "minimum": 5, "maximum": 1200 },
+    "orientation": { "enum": ["horizontal", "vertical"] },
+    "language": { "type": "string", "pattern": "^[a-z]{2}(-[A-Za-z]{2,4})?$" },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false
+}

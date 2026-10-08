@@ -1,0 +1,36 @@
+[
+  {
+    "id": "launch-teaser",
+    "kind": "video",
+    "url": "https://cdn.example.com/launch-teaser.mp4",
+    "contentType": "video/mp4",
+    "title": "Launch teaser (30s)",
+    "metadata": { "tags": ["launch", "teaser"], "durationSeconds": 30 }
+  },
+  {
+    "id": "launch-slide-1",
+    "kind": "image",
+    "url": "https://cdn.example.com/launch-slide-1.jpg",
+    "contentType": "image/jpeg",
+    "title": "Launch slide 1",
+    "altText": "Product screenshot with the headline 'We are live'.",
+    "metadata": { "tags": ["launch", "carousel"] }
+  },
+  {
+    "id": "launch-slide-2",
+    "kind": "image",
+    "url": "https://cdn.example.com/launch-slide-2.jpg",
+    "contentType": "image/jpeg",
+    "title": "Launch slide 2",
+    "altText": "Feature overview grid.",
+    "metadata": { "tags": ["launch", "carousel"] }
+  },
+  {
+    "id": "brand-guidelines",
+    "kind": "document",
+    "url": "https://cdn.example.com/brand-guidelines.pdf",
+    "contentType": "application/pdf",
+    "title": "Brand guidelines",
+    "metadata": { "tags": ["brand"] }
+  }
+]

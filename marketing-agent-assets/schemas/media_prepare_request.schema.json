@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/example/marketing-agent-assets/schemas/media_prepare_request.schema.json",
+  "title": "Media Prepare Request",
+  "description": "Body of POST {pool}/{id}/prepare. The app answers with an Asset (asset.schema.json) that is ready for the target: a fresh short-lived URL and, where the target needs it, a converted format. It answers 422 {error, reasons[]} when the asset cannot be made ready.",
+  "type": "object",
+  "required": ["target"],
+  "properties": {
+    "target": {
+      "type": "object",
+      "required": ["platform", "action"],
+      "properties": {
+        "platform": { "enum": ["instagram", "youtube", "tiktok"] },
+        "action": { "enum": ["video.publish", "instagram.carousel"] }
+      },
+      "additionalProperties": false
+    },
+    "ttlSeconds": { "type": "integer", "minimum": 60, "maximum": 86400 }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,15 @@
+{
+  "name": "asset-pool",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Zero-dependency kit for exposing an app's approved media assets to a marketing agent (GET /api/assets contract).",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "node bin/check.js",
+    "example:minimal": "node examples/minimal/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

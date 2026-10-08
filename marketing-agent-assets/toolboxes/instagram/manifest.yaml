@@ -1,0 +1,77 @@
+name: instagram-toolbox
+version: 0.1.0
+runtime: python
+entrypoint: api/toolbox.py
+browser_entrypoint: browser/toolbox.py
+legacy_source: legacy_combined_toolbox.py
+platform: instagram
+required_env:
+  - INSTAGRAM_ACCESS_TOKEN
+  - INSTAGRAM_USER_ID
+oauth_scopes:
+  - instagram_basic
+  - instagram_content_publish
+  - instagram_manage_comments
+  - instagram_manage_insights
+rate_limit_note: Publishing and insights availability depend on account type, Meta app review, and Graph API limits.
+actions:
+  api:
+    production_eligible: true
+    function_prefixes: [get_instagram_api_, create_instagram_api_, publish_instagram_api_, reply_instagram_api_, set_instagram_api_, delete_instagram_api_]
+    writes_external_state: true
+  browser:
+    supervised_local_only: true
+    function_prefixes: [launch_instagram_browser, open_instagram_page, comment_instagram_post, send_instagram_message, publish_instagram_post, follow_instagram_account, like_instagram_post]
+    writes_external_state: true
+data_collection:
+  # Read-only actions the platform-data worker (../platform_data_worker) may run for
+  # the agent. This is an ALLOWLIST: an action or param that is not listed here is
+  # refused, and only get_/search_/list_ functions may ever be named. `function`
+  # is looked up in api/toolbox.py; params not declared below are rejected, so the
+  # toolbox's `fields`/`part`/`user_id` style knobs stay at their defaults
+  # (own account, default field set). personal_data marks actions whose result
+  # contains other people's content (comment authors and text).
+  actions:
+    profile:
+      function: get_instagram_api_profile
+      description: Profile and follower counts of the configured professional account.
+      rate_limit_per_hour: 60
+      params: {}
+    media:
+      function: get_instagram_api_media
+      description: Recent media of the configured account.
+      rate_limit_per_hour: 120
+      params:
+        limit: {type: integer, minimum: 1, maximum: 100}
+        after: {type: string, max_length: 200}
+    media_details:
+      function: get_instagram_api_media_details
+      description: One media object of the configured account.
+      rate_limit_per_hour: 120
+      params:
+        media_id: {type: string, required: true, max_length: 64, pattern: '^[0-9A-Za-z_-]+$'}
+    comments:
+      function: get_instagram_api_comments
+      description: Comments on a media object of the configured account.
+      personal_data: true
+      rate_limit_per_hour: 60
+      params:
+        media_id: {type: string, required: true, max_length: 64, pattern: '^[0-9A-Za-z_-]+$'}
+        limit: {type: integer, minimum: 1, maximum: 100}
+        after: {type: string, max_length: 200}
+    account_insights:
+      function: get_instagram_api_account_insights
+      description: Account-level insight metrics.
+      rate_limit_per_hour: 60
+      params:
+        metrics: {type: string, max_length: 200, pattern: '^[a-z_,]+$'}
+        period: {type: string, enum: [day, week, days_28, lifetime]}
+        since: {type: string, max_length: 40}
+        until: {type: string, max_length: 40}
+    media_insights:
+      function: get_instagram_api_media_insights
+      description: Insight metrics for one media object.
+      rate_limit_per_hour: 120
+      params:
+        media_id: {type: string, required: true, max_length: 64, pattern: '^[0-9A-Za-z_-]+$'}
+        metrics: {type: string, max_length: 200, pattern: '^[a-z_,]+$'}

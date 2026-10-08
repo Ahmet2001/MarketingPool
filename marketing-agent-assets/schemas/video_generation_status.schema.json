@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/example/marketing-agent-assets/schemas/video_generation_status.schema.json",
+  "title": "Video Generation Status",
+  "description": "Response of POST {video-requests} (202) and GET {video-requests}/{id}. `asset` is a DRAFT for review: it is publishable only once the same asset also appears in the asset pool (GET {pool}/{id} -> 200), because the pool is where the app's approval decision lives.",
+  "type": "object",
+  "required": ["requestId", "status"],
+  "properties": {
+    "requestId": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["queued", "running", "done", "failed"] },
+    "progress": {
+      "type": "object",
+      "properties": {
+        "current": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 },
+        "message": { "type": "string", "maxLength": 500 }
+      },
+      "additionalProperties": false
+    },
+    "asset": { "$ref": "asset.schema.json" },
+    "approval": { "enum": ["pending", "approved"] },
+    "error": { "type": "string" }
+  },
+  "additionalProperties": false
+}
