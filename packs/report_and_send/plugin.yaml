@@ -1,0 +1,14 @@
+name: report_and_send
+version: 0.1.0
+type: agent_bundle
+description: Summarises a text into a short report and sends it to a recipient. Sending
+  needs approval.
+tools:
+- name: report_and_send
+  file: tools/report_and_send.py
+  description: Summarises a text into a short report and sends it to a recipient.
+    Sending needs approval.
+  params_note: '{"text": "<text>", "title": "<text>", "to": "<text>"}'
+  env_vars: []
+agents:
+- agents/report_and_send_agent.yaml

@@ -1,0 +1,10 @@
+name: report_and_send_agent
+type: config
+enabled: true
+description: Summarises a text into a short report and sends it to a recipient. Sending
+  needs approval. Delegate to this agent to run the `report_and_send` workflow.
+model: default
+tool_mode: custom
+tools:
+- report_and_send
+system_prompt_file: prompts/report_and_send_agent.md

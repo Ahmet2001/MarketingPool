@@ -1,0 +1,10 @@
+name: text_report_agent
+type: config
+enabled: true
+description: 'Runs 4 step(s): demo.word_count, text.keywords, demo.headline, text.report.
+  Delegate to this agent to run the `text_report` workflow.'
+model: default
+tool_mode: custom
+tools:
+- text_report
+system_prompt_file: prompts/text_report_agent.md

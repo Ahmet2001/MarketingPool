@@ -1,0 +1,12 @@
+name: text_report
+version: 0.1.0
+type: agent_bundle
+description: 'Runs 4 step(s): demo.word_count, text.keywords, demo.headline, text.report.'
+tools:
+- name: text_report
+  file: tools/text_report.py
+  description: 'Runs 4 step(s): demo.word_count, text.keywords, demo.headline, text.report.'
+  params_note: '{"source": "<file:any>", "title": "<text>"}'
+  env_vars: []
+agents:
+- agents/text_report_agent.yaml

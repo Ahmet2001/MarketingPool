@@ -1,0 +1,12 @@
+name: human_size
+version: 0.1.0
+type: agent_bundle
+description: Writes a number of bytes in human units, for example 1.5 MB.
+tools:
+- name: human_size
+  file: tools/human_size.py
+  description: Writes a number of bytes in human units, for example 1.5 MB.
+  params_note: '{"byte_count": "<integer>"}'
+  env_vars: []
+agents:
+- agents/human_size_agent.yaml

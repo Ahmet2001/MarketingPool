@@ -127,6 +127,7 @@ services:
       <<: *queue-env
       TOOLBOXES_DIR: /toolboxes
       STUDIO_TOOL_HOME: /data/studio_tools   # run folders of tools exported from the workflow factory
+      STUDIO_FILE_ROOTS: /data/workspace/inbox   # the only folder an exported tool may read local files from
       AGENT_WORKER_MCP_HOST: 0.0.0.0
       AGENT_WORKER_MCP_TOKEN: ${AGENT_MCP_TOKEN:?run python3 docker/make_env.py}
     env_file:

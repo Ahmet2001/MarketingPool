@@ -1,0 +1,10 @@
+name: human_size_agent
+type: config
+enabled: true
+description: Writes a number of bytes in human units, for example 1.5 MB. Delegate
+  to this agent to run the `human_size` workflow.
+model: default
+tool_mode: custom
+tools:
+- human_size
+system_prompt_file: prompts/human_size_agent.md
