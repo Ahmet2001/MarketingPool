@@ -28,7 +28,8 @@ Four repositories, one idea: **fit an LLM agent to your own system.**
 
 ```mermaid
 flowchart LR
-    S[MarketingStudio<br/>factory] -->|exports workflows, tools, packs| A
+    S[MarketingStudio<br/>factory] -->|agent packs, tools| E
+    S -->|workers, job handlers| A
     subgraph Pool[MarketingPool: an example]
         E[Ethgent<br/>agent] <-->|requests, results| A[Marketing Agent Assets<br/>workers, connectors, tools]
     end
