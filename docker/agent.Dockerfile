@@ -33,4 +33,5 @@ ENV PYTHONUNBUFFERED=1 ETHGENT_WORKSPACE_DIR=/data/workspace ETHGENT_CONFIG_DIR=
 # The config (agents.yaml, custom_tools.yaml, ...) lives on the /data volume so that installed packs survive a
 # container being recreated. The image's defaults are copied in on first start; files already there are kept.
 # xvfb-run hangs here without ever starting Python, so the virtual screen is started by hand.
-CMD ["sh", "-c", "mkdir -p /data/config && cp -rn /app/MarketingApp/config/. /data/config/; rm -f /tmp/.X99-lock; Xvfb :99 -screen 0 1280x800x24 -nolisten tcp & sleep 2; exec python -m MarketingApp.worker"]
+# A container that was stopped while Chrome ran leaves a profile lock on the volume; Chrome then refuses to start.
+CMD ["sh", "-c", "mkdir -p /data/config && cp -rn /app/MarketingApp/config/. /data/config/; rm -f /tmp/.X99-lock /data/workspace/chrome_profile/Singleton*; Xvfb :99 -screen 0 1280x800x24 -nolisten tcp & sleep 2; exec python -m MarketingApp.worker"]
