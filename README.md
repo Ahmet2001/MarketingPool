@@ -18,6 +18,7 @@ This repository is the example where the first two meet. It is not the only way 
 
 - [What is in here](#what-is-in-here)
 - [The big picture](#the-big-picture)
+- [What sets it apart](#what-sets-it-apart)
 - [How the pieces fit](#how-the-pieces-fit)
 - [Quick start](#quick-start)
 - [Talk to the agent](#talk-to-the-agent)
@@ -59,6 +60,16 @@ flowchart LR
 ```
 
 When the agent and the assets are joined to a system, the LLM gets feedback from it (it can read your data) and can give something back (it can publish, or write into your app). Connected to your app, it can collect material from it, create content and publish it.
+
+## What sets it apart
+
+- **Portable export from the factory.** You write a workflow once in the Studio. The same workflow then comes out as an agent tool, a queue worker, a job handler or an MCP server. A standard-library runner is embedded in every export, so running it does not need the Studio.
+- **Keys live in workers, approval comes from the host.** The agent never holds platform credentials. Whether something that changes the outside world may run is decided by the host (a person, or an explicit grant on the job), not by the model, and the rule travels with every export. This is tested, including a hole in our own first design (a model that could approve itself) that we found and fixed.
+- **Open contribution.** Most contributions are declarative: a manifest entry, a skill, a schema, a pack. There is no single "asset"; anyone can publish theirs on GitHub, and the agent shows a preview before it installs one.
+- **Domain independent.** Marketing is the example. The same skeleton could be fitted to trading or HR. We have not built those.
+- **Runs on your own infrastructure.** One machine with Docker, no hosted queue (no Supabase), your own model key. There is no hosted dependency.
+
+We have not compared this against other tools in depth, and no group of independent contributors has used the pool yet. These are properties of the design, not measured advantages.
 
 ## How the pieces fit
 
