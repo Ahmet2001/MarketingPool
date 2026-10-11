@@ -84,8 +84,8 @@ below is exactly what was done, so you can diff against it:
 
 1. `asset-pool/src/*.js`, plus `assetSource.js` and `videoSource.js`, copied
    as-is into `karatahta2/services/assetPool/`.
-2. [`karatahta2/routes/assetPool.js`](../../../../karatahta2/routes/assetPool.js
-   in a sibling checkout — this repo doesn't vendor Kara Tahta's source)
+2. [`routes/assetPool.js`](https://github.com/ethosoftai/karatahta-oss/blob/main/routes/assetPool.js)
+   in the open-source Kara Tahta repository (this repo doesn't vendor its source)
    wires them to the app's real functions:
 
    ```js

@@ -182,9 +182,27 @@ included purely as a worked example of mapping a real app onto the contract.
 **Honest scope:** this repository contains no live App. The kit and the Kara
 Tahta example are tested against fakes and a local reference server, and the
 agent's tools were exercised over real HTTP against `asset-pool`'s minimal
-example — but the Kara Tahta example has not been run against a live Kara Tahta
-deployment. Until `APP_INTERNAL_URL` is set, every call returns a clear
-configuration error instead of silently failing or fabricating data.
+example. On 10 October 2026 the Kara Tahta adapter was also run against the
+**real Kara Tahta code**, unmodified (open source at
+<https://github.com/ethosoftai/karatahta-oss>; the code that was run is byte-identical to its routes, services,
+migrations, server and workers at commit `8658c59`) in one Docker Compose
+project together with this agent. What was checked: the conformance checker
+(`asset-pool/bin/check.js`) passed 19 of 19 checks (video generation was not
+enabled, so that one was skipped); the agent listed exactly the approved assets
+and never the private, unfinished or imported YouTube lessons (0 leaks in 10
+runs); the agent's database role (`marketing_agent_writer`, see above) was
+refused on the app's tables (HTTP 403) while it could still use its own queue;
+and with the app stopped the agent said so instead of inventing assets.
+
+What that run is **not**: a production deployment. The app's database was plain
+Postgres with a REST layer instead of Supabase, its media were local files with
+a self-signed https front, the data were five test lessons, and nothing was
+published. Preparing and validating media for a platform was refused by the
+agent's own guard against private addresses (the test media host is private),
+so that step still needs a run against a public media URL. Video generation
+through the contract was not exercised. Until `APP_INTERNAL_URL` is set, every
+call returns a clear configuration error instead of silently failing or
+fabricating data.
 
 These tools are read-only by design: no credentials, upload, or approval-state
 mutation ever happens through them, per the responsibility map's "does not
