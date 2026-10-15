@@ -112,13 +112,18 @@ services:
     build:
       context: ./agent
       dockerfile: ../docker/agent.Dockerfile
-    depends_on: [queue]
     restart: unless-stopped
     shm_size: "1gb"          # Chromium needs more shared memory than Docker's default
     ports:
       - "127.0.0.1:8091:8091"
+    depends_on: [queue, sandbox]
+    networks: [default, sandbox]
     volumes:
       - agent-data:/data
+      # Python packages that installed packs need (docker/install_pack.sh); the sandbox reads them too.
+      - pack-deps:/data/site-packages
+      # Files handed to the agent for workflow tools to read (STUDIO_FILE_ROOTS); the sandbox reads them too.
+      - inbox:/data/workspace/inbox
       # The agent checks a platform-data request against the toolbox manifests before queueing it.
       - ./marketing-agent-assets/toolboxes:/toolboxes:ro
       # Agent packs exported from the workflow factory (see docker/README.md).
@@ -130,10 +135,46 @@ services:
       STUDIO_FILE_ROOTS: /data/workspace/inbox   # the only folder an exported tool may read local files from
       AGENT_WORKER_MCP_HOST: 0.0.0.0
       AGENT_WORKER_MCP_TOKEN: ${AGENT_MCP_TOKEN:?run python3 docker/make_env.py}
+      # Tools from installed packs run in the sandbox service below, not in this container.
+      ETHGENT_SANDBOX: remote
+      ETHGENT_SANDBOX_URL: http://sandbox:8092
+      ETHGENT_SANDBOX_TOKEN: ${SANDBOX_TOKEN:?run python3 docker/make_env.py}
     env_file:
       - path: ./env/agent.env
         required: false
 
+  # Runs the tools of installed agent packs, one limited subprocess per call. Same image as the agent, but it
+  # holds no secret except the token, cannot write its filesystem, and is on a network of its own: it can reach
+  # the internet and the agent can reach it, but it cannot reach the queue or the database.
+  sandbox:
+    build:
+      context: ./agent
+      dockerfile: ../docker/agent.Dockerfile
+    command: ["python", "-m", "MarketingApp.sandbox.service"]
+    restart: unless-stopped
+    networks: [sandbox]
+    read_only: true
+    tmpfs: ["/tmp:size=256m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    user: "65534:65534"
+    mem_limit: 2g
+    pids_limit: 256
+    volumes:
+      - pack-deps:/data/site-packages:ro
+      - inbox:/data/workspace/inbox:ro
+    environment:
+      HOME: /tmp
+      ETHGENT_SANDBOX_TOKEN: ${SANDBOX_TOKEN:?run python3 docker/make_env.py}
+      # Workflow tools read local files only from here, and get this variable from the service.
+      STUDIO_FILE_ROOTS: /data/workspace/inbox
+      ETHGENT_SANDBOX_SHARED_ENV: STUDIO_FILE_ROOTS
+
+networks:
+  sandbox:
+
 volumes:
   db-data:
   agent-data:
+  pack-deps:
+  inbox:

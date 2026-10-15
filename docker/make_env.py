@@ -36,6 +36,7 @@ def main() -> int:
         "JWT_SECRET": jwt_secret,
         "SERVICE_KEY": token(jwt_secret, "service_role"),
         "AGENT_MCP_TOKEN": secrets.token_urlsafe(32),  # bearer token for the agent's MCP port
+        "SANDBOX_TOKEN": secrets.token_urlsafe(32),  # between the agent and its sandbox service
     }
     missing = {k: v for k, v in wanted.items() if k not in have}
     if not missing:
