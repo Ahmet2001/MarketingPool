@@ -10,5 +10,6 @@ tools:
     Sending needs approval.
   params_note: '{"text": "<text>", "title": "<text>", "to": "<text>"}'
   env_vars: []
+  requires_approval: true
 agents:
 - agents/report_and_send_agent.yaml

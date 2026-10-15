@@ -12,7 +12,7 @@ The tool is called `report_and_send`. It is one Python file and needs nothing fr
 
 ## Approval
 
-This workflow changes something outside the machine (`send` (outbox.send)). The tool asks the agent app's approval gate (`MarketingApp.environments.approval_runtime`) before it runs, and the model cannot answer for it. Unattended, put the tool name in the job: `"approved_tools": ["report_and_send"]` in the `agent_jobs` payload. At a terminal the person is asked. Without such a gate the tool refuses to run.
+This workflow changes something outside the machine (`send` (outbox.send)), so `plugin.yaml` marks the tool `requires_approval: true`: the agent app asks its approval gate before the call, and the model cannot answer for it. The tool also asks the gate itself (`MarketingApp.environments.approval_runtime`), which covers an agent app that does not read the mark. Unattended, put the tool name in the job: `"approved_tools": ["report_and_send"]` in the `agent_jobs` payload. At a terminal the person is asked. Without such a gate the tool refuses to run.
 
 ## Where runs go
 
