@@ -27,6 +27,10 @@ COPY . .
 # config/agents.yaml pins some sub-agents to a Gemma model name that other providers reject. "default" means
 # "use SUBMODEL_MODEL_NAME from the environment". The source file is left as it is; only the image changes.
 RUN sed -i 's/^  model: gemma-4-26b-a4b-it$/  model: default/' MarketingApp/config/agents.yaml
+# The two sub-agents that connect to the app and the platform-data worker ship off in Ethgent (a terminal user
+# has neither); here both exist, so they are switched on.
+RUN sed -i '/^- name: \(asset_collector_agent\|platform_data_agent\)$/,/^  enabled:/ s/^  enabled: false$/  enabled: true/' MarketingApp/config/agents.yaml \
+    && test "$(grep -A2 -E '^- name: (asset_collector_agent|platform_data_agent)$' MarketingApp/config/agents.yaml | grep -c 'enabled: true')" = 2
 ENV PYTHONUNBUFFERED=1 ETHGENT_WORKSPACE_DIR=/data/workspace ETHGENT_CONFIG_DIR=/data/config PYTHONPATH=/data/site-packages DISPLAY=:99
 # Python packages that exported workflows need are installed into /data/site-packages (see docker/install_pack.sh),
 # so they also survive the container being recreated and need no image rebuild.

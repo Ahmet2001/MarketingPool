@@ -1,5 +1,7 @@
 # Marketing Agent (Ethgent)
 
+> This page used to be `agent/AGENT.md`. The agent now comes from [ethosoftai/Ethgent](https://github.com/ethosoftai/Ethgent) as the `agent/` submodule; this page stays here because it describes how that agent is connected in this example.
+
 An OpenAI-compatible, tool-calling orchestrator (`BaseModel`) that delegates
 content-creation, research, and social-operations work to specialized
 sub-agents. This is the `agents/marketing-agent` referenced in the repo
@@ -92,7 +94,7 @@ exist in this repository yet.
 `future_work.md`'s "Present external-write actions for approval when
 required" rule now has a real gate, not just documentation: before either
 publish tool inserts a job, it calls
-[`environments/approval_runtime.request_tool_approval`](./MarketingApp/environments/approval_runtime.py).
+[`environments/approval_runtime.request_tool_approval`](../agent/MarketingApp/environments/approval_runtime.py).
 That module is a process-wide registry (same pattern as
 `automation_runtime.py`/`vlm_araclari.get_registered_bot()`) that any plain
 `araclar/` function can reach into without holding a `BaseModel` reference:
@@ -124,7 +126,7 @@ same content — a network retry, an LLM re-attempting a tool call it thinks
 failed — hits the unique index added in
 [`../marketing-agent-assets/social-media-worker/migrations/002_publish_jobs_idempotency_key.sql`](../marketing-agent-assets/social-media-worker/migrations/002_publish_jobs_idempotency_key.sql)
 (and this repo's own
-[`migrations/002_agent_jobs_idempotency_key.sql`](./migrations/002_agent_jobs_idempotency_key.sql))
+[`migrations/002_agent_jobs_idempotency_key.sql`](../agent/migrations/002_agent_jobs_idempotency_key.sql))
 and returns the **existing** job's status instead of creating a duplicate.
 Trade-off, stated plainly: two genuinely-intentional identical publishes
 (same URL, same caption, same platforms) will also dedupe. Given how
@@ -164,7 +166,7 @@ The `future_work.md` "Planned worker environment interface" item #1
 (`collect_assets`) now has a first concrete implementation on the agent
 side: a new `asset_collector_agent` sub-agent with three tools
 (`app_baglanti_durumu`, `app_asset_listele`, `app_asset_detay`, in
-[`MarketingApp/araclar/app_asset_araclari.py`](./MarketingApp/araclar/app_asset_araclari.py))
+[`MarketingApp/araclar/app_asset_araclari.py`](../agent/MarketingApp/araclar/app_asset_araclari.py))
 that read approved media assets — matching
 [`schemas/asset.schema.json`](../marketing-agent-assets/schemas/asset.schema.json) — from **any
 app** that implements the [asset-pool contract](../marketing-agent-assets/asset-pool/README.md):
@@ -214,7 +216,7 @@ the App.
 ## Preparing media for publish (new)
 
 `future_work.md` item #3 (`prepare_media`). Two tools in
-[`MarketingApp/araclar/medya_araclari.py`](./MarketingApp/araclar/medya_araclari.py),
+[`MarketingApp/araclar/medya_araclari.py`](../agent/MarketingApp/araclar/medya_araclari.py),
 both on `asset_collector_agent`:
 
 - `medya_dogrula(url, aksiyon, platformlar)` checks an arbitrary HTTPS URL
@@ -234,7 +236,7 @@ both on `asset_collector_agent`:
 That last point matters: `future_work.md`'s security rules say signed URLs
 must never enter an LLM prompt. A prepared asset's URL is exactly that kind
 of URL, so it's never handed to the model — `medya_hazirla` stores it in
-[`environments/media_registry.py`](./MarketingApp/environments/media_registry.py)
+[`environments/media_registry.py`](../agent/MarketingApp/environments/media_registry.py)
 (a small workspace-local file, chmod 600) and returns a `media_ref` handle
 the model can safely see and pass along. `worker_video_yayinla` /
 `worker_instagram_carousel_yayinla` accept `media_ref` as an alternative to
@@ -259,7 +261,7 @@ publishes.
 would otherwise mean a real architecture change (content_creator_agent
 currently renders locally via Playwright/stock footage; this is the
 alternative path of asking the App to render instead). Two tools in
-[`MarketingApp/araclar/video_uretim_araclari.py`](./MarketingApp/araclar/video_uretim_araclari.py),
+[`MarketingApp/araclar/video_uretim_araclari.py`](../agent/MarketingApp/araclar/video_uretim_araclari.py),
 on `asset_collector_agent`:
 
 - `video_uretimi_iste(brief, baslik, sure_saniye, yonelim, dil)` — `brief`
@@ -299,7 +301,7 @@ is included as a worked example (Kara Tahta's own `/api/generate-lesson` /
 `future_work.md` item #2 (`collect_platform_data`) — the one capability
 that needs a **second, standalone worker**, because it needs platform
 credentials this agent must never hold. Three tools in
-[`MarketingApp/araclar/platform_veri_araclari.py`](./MarketingApp/araclar/platform_veri_araclari.py),
+[`MarketingApp/araclar/platform_veri_araclari.py`](../agent/MarketingApp/araclar/platform_veri_araclari.py),
 now on their own sub-agent, `platform_data_agent` (kept separate from
 `sosyal_medya_agent` so a purely read-only analysis task can run without
 ever touching the browser-based social tools):
@@ -310,7 +312,7 @@ ever touching the browser-based social tools):
 - `platform_veri_durumu(job_id)` polls it later if it didn't finish in time.
 
 These insert into a new `platform_data_jobs` Supabase table (migration:
-[`migrations/001_agent_jobs.sql`](./migrations/001_agent_jobs.sql)'s sibling
+[`migrations/001_agent_jobs.sql`](../agent/migrations/001_agent_jobs.sql)'s sibling
 in [`../marketing-agent-assets/platform_data_worker/migrations/`](../marketing-agent-assets/platform_data_worker/migrations))
 and read the result back — the agent process never holds a YouTube, Instagram,
 TikTok, X, or Reddit credential. **[`platform_data_worker`](../marketing-agent-assets/platform_data_worker)
@@ -337,7 +339,7 @@ instance, serialized through the existing `AutomationCoordinator` so they
 never touch `BaseModel`/the browser session concurrently:
 
 1. **Queue poller** — polls the new `agent_jobs` Supabase table (schema in
-   [`migrations/001_agent_jobs.sql`](./migrations/001_agent_jobs.sql), same
+   [`migrations/001_agent_jobs.sql`](../agent/migrations/001_agent_jobs.sql), same
    Supabase project as `publish_jobs`) for `status='queued'` rows, claims one
    at a time (`claim_next_agent_job()`, same skip-locked pattern as
    `social-media-worker`'s `claim_publish_job()`), runs
@@ -363,7 +365,7 @@ want on-demand calls.
 **Known limitation:** the two entry points coordinate with each other only
 *inside this one process*. Running `worker.py` and `main.py` against the
 same `workspace_dir` at the same time is unsupported — that's the same
-single-process/single-workspace constraint [`agent_api.py`](./MarketingApp/agent_api.py)
+single-process/single-workspace constraint [`agent_api.py`](../agent/MarketingApp/agent_api.py)
 already documents for `EthgentAgent`, just restated here because `worker.py`
 is a second thing that constructs one. Pick one per workspace.
 
@@ -383,7 +385,7 @@ this change invents.
 
 This agent is a full, independently runnable copy of the upstream
 [BrowserAgent](https://github.com/Ahmet2001/BrowserAgent) project (as of the
-commit it was copied at). See its own [README](./README.md) for setup,
+commit it was copied at). See its own [README](../agent/README.md) for setup,
 configuration, and terminal usage — nothing about running it changed by
 being placed here.
 
@@ -404,7 +406,7 @@ gated tools are refused there.
 
 ## Embedding
 
-[`MarketingApp/agent_api.py`](./MarketingApp/agent_api.py) exposes a
+[`MarketingApp/agent_api.py`](../agent/MarketingApp/agent_api.py) exposes a
 side-effect-free `EthgentAgent` class (no heartbeat/Telegram/Discord
 auto-start) for calling this agent programmatically from another
 orchestrator, with an injectable workspace/config directory. See its

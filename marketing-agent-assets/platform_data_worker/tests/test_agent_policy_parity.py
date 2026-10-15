@@ -10,12 +10,16 @@ trip and confusing the model. This test runs the SAME cases through both and
 requires the same accept/reject verdict, params, and error text against the
 REAL manifests.
 """
+import os
 import sys
 import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-AGENT_ROOT = REPO / "agents" / "marketing-agent"
+# The agent is Ethgent: the `agent/` submodule next to this folder in MarketingPool, or a checkout named by
+# ETHGENT_ROOT. Without either, the test is skipped.
+AGENT_ROOT = Path(os.environ.get("ETHGENT_ROOT") or REPO.parent / "agent")
+os.environ.setdefault("TOOLBOXES_DIR", str(REPO / "toolboxes"))
 
 if str(AGENT_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENT_ROOT))

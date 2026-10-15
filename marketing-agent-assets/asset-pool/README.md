@@ -199,7 +199,7 @@ generation, gated by an approval step and a daily cap — see the agent's
 `AGENT.md`). A successful listing is cached in the agent workspace so other
 agents reuse the URLs. One pool per agent process — to automate several
 apps, run one agent worker per app. See the agent's
-[`AGENT.md`](../../agent/AGENT.md).
+[`docs/agent-connection.md`](../../docs/agent-connection.md).
 
 ## Examples
 

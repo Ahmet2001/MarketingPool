@@ -38,7 +38,7 @@ flowchart LR
 
 ## What has been checked
 
-The worker, toolbox, schema, example and skill layers are available. The agent is wired to the worker's `publish_jobs` queue for its two supported actions (`video.publish`, `instagram.carousel`), with an approval gate and idempotency keys in front of it. [`asset-pool/`](./asset-pool) is a contract and kit any app can implement (`collect_assets` is required; `prepare_media` and `request_video_generation` are optional); one real app has it wired into its own server, checked over HTTP ([example](./asset-pool/examples/karatahta/README.md)). [`platform_data_worker/`](./platform_data_worker) is a standalone worker for read-only platform data that refuses anything not on the per-platform allowlist in each `toolboxes/*/manifest.yaml`. What is real and what still needs live credentials is listed in [`agent/AGENT.md`](../agent/AGENT.md). Real publishing and real platform data have not been run.
+The worker, toolbox, schema, example and skill layers are available. The agent is wired to the worker's `publish_jobs` queue for its two supported actions (`video.publish`, `instagram.carousel`), with an approval gate and idempotency keys in front of it. [`asset-pool/`](./asset-pool) is a contract and kit any app can implement (`collect_assets` is required; `prepare_media` and `request_video_generation` are optional); one real app has it wired into its own server, checked over HTTP ([example](./asset-pool/examples/karatahta/README.md)). [`platform_data_worker/`](./platform_data_worker) is a standalone worker for read-only platform data that refuses anything not on the per-platform allowlist in each `toolboxes/*/manifest.yaml`. What is real and what still needs live credentials is listed in [`docs/agent-connection.md`](../docs/agent-connection.md). Real publishing and real platform data have not been run.
 
 ## Open contribution
 
@@ -67,7 +67,7 @@ What every contribution has to respect (details in [CONTRIBUTING.md](./CONTRIBUT
 | Area | What it provides |
 | --- | --- |
 | [`social-media-worker/`](./social-media-worker) | Node.js queue worker for video publishing and Instagram carousels. |
-| [`agent/`](../agent) | Tool-calling LLM orchestrator that creates content and queues schema-valid publish jobs onto the worker. See its [`AGENT.md`](../agent/AGENT.md). |
+| [`agent/`](../agent) | Tool-calling LLM orchestrator that creates content and queues schema-valid publish jobs onto the worker. See [`docs/agent-connection.md`](../docs/agent-connection.md). |
 | [`asset-pool/`](./asset-pool) | Dependency-free kit + conformance checker for exposing **your own app's** approved media, media preparation, and video-generation endpoints to the agent. Kara Tahta is included only as a worked example. |
 | [`platform_data_worker/`](./platform_data_worker) | Standalone worker that holds platform credentials and answers read-only data requests from the agent, checked against a manifest allowlist. |
 | [`toolboxes/`](./toolboxes) | Official-API and supervised-browser capabilities for X, Instagram, Reddit, YouTube, and TikTok. Each API toolbox also declares its `data_collection` read-only allowlist for `platform_data_worker`. |

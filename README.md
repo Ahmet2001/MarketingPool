@@ -33,7 +33,7 @@ This repository is the example where the first two meet. It is not the only way 
 
 | Folder | What it is |
 | --- | --- |
-| [`agent/`](./agent) | **The agent (Ethgent).** An orchestrator LLM that hands work to specialised sub-agents: social media, content creation, asset collection, platform data. It runs as a worker: it polls a job queue and also serves MCP. Talks to OpenAI-compatible model APIs: tested with DeepSeek; Gemini and Kimi/Moonshot are supported in the code. |
+| [`agent/`](./agent) | **The agent ([Ethgent](https://github.com/ethosoftai/Ethgent)), as a git submodule pinned to one commit.** An orchestrator LLM that hands work to specialised sub-agents: social media, content creation, asset collection, platform data. It runs as a worker: it polls a job queue and also serves MCP. Talks to OpenAI-compatible model APIs: tested with DeepSeek; Gemini and Kimi/Moonshot are supported in the code. |
 | [`marketing-agent-assets/`](./marketing-agent-assets) | **The open pool.** Queue workers (publishing, scheduling, read-only platform data, MCP), official-API toolboxes for X, Instagram, Reddit, YouTube and TikTok, an app-connection kit (`asset-pool`), shared JSON schemas, LLM decision guides (skills) and examples. |
 | [`docker-compose.yml`](./docker-compose.yml) · [`docker/`](./docker) | Runs the agent and the workers together on one machine, with a **local queue** (Postgres + PostgREST) where a hosted Supabase would normally be. |
 | [`manifesto.md`](./manifesto.md) | The main manifesto: why these pieces exist, how they relate, what is real today. |
@@ -44,7 +44,7 @@ Four repositories, one idea. None of them is a placeholder for another.
 
 | Repository | Role |
 | --- | --- |
-| [**Ethgent**](./agent) (upstream: [BrowserAgent](https://github.com/Ahmet2001/BrowserAgent)) | The customisable agent: an orchestrator, sub-agents and tools that live in YAML and packs. Tuned for social media today; the same shape can be fitted to other domains. |
+| [**Ethgent**](https://github.com/ethosoftai/Ethgent) (here as the [`agent/`](./agent) submodule) | The customisable agent: an orchestrator, sub-agents and tools that live in YAML and packs. Tuned for social media today; the same shape can be fitted to other domains. |
 | [**Marketing Agent Assets**](./marketing-agent-assets) | The connection to a system, and an open pool: workers, connectors, toolboxes, contracts, guides. There is no single "asset"; anyone can add their own. |
 | [**MarketingStudio**](https://github.com/Ahmet2001/MarketingStudio) | The factory: build a workflow once, export it as an agent pack, MCP server, worker and more. |
 | **MarketingPool** (this repository) | The example: the agent and the assets together, running with Docker. |
@@ -98,7 +98,7 @@ Two ideas hold it together:
 **You need:** Docker with the Compose plugin (`docker compose version`), Python 3 (only to generate local secrets), a model API key, and about 3 GB of disk for the images.
 
 ```bash
-git clone https://github.com/Ahmet2001/MarketingPool.git
+git clone --recurse-submodules https://github.com/Ahmet2001/MarketingPool.git
 cd MarketingPool
 
 python3 docker/make_env.py                    # writes .env with local queue secrets (never committed)
@@ -183,4 +183,4 @@ Related project: [MarketingStudio](https://github.com/Ahmet2001/MarketingStudio)
 
 ## License
 
-Each part carries its own MIT license: [`agent/LICENSE`](./agent/LICENSE) and [`marketing-agent-assets/LICENSE`](./marketing-agent-assets/LICENSE) (their copyright lines differ). Read [`marketing-agent-assets/SOURCE_NOTICE.md`](./marketing-agent-assets/SOURCE_NOTICE.md) before reusing the platform toolboxes. Platform terms, user consent and authorisation for every external write remain the integrator's responsibility.
+Each part carries its own MIT license: [`agent/LICENSE`](https://github.com/ethosoftai/Ethgent/blob/main/LICENSE) and [`marketing-agent-assets/LICENSE`](./marketing-agent-assets/LICENSE) (their copyright lines differ). Read [`marketing-agent-assets/SOURCE_NOTICE.md`](./marketing-agent-assets/SOURCE_NOTICE.md) before reusing the platform toolboxes. Platform terms, user consent and authorisation for every external write remain the integrator's responsibility.
