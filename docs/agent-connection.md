@@ -401,8 +401,8 @@ the job approved that tool beforehand, by naming it in the job:
 `{"task": "...", "approved_tools": ["worker_video_yayinla"]}` in the
 `agent_jobs` payload. The list comes from whoever can write to the queue,
 never from the model, so a task text cannot grant it (see
-`environments/approval_runtime.py`). An MCP call has no such list yet, so
-gated tools are refused there.
+`environments/approval_runtime.py`). An MCP call can approve only tools the
+operator lists in `AGENT_WORKER_MCP_APPROVABLE_TOOLS` (empty by default).
 
 ## Embedding
 
