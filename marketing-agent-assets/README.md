@@ -21,7 +21,7 @@ Four repositories, one idea: **fit an LLM agent to your own system.**
 
 | Repository | Role |
 | --- | --- |
-| [**Ethgent**](https://github.com/Ahmet2001/BrowserAgent) | The customisable agent: an orchestrator, sub-agents and tools that live in YAML and packs. Tuned for social media today; the same shape can be fitted to other domains. A separate project that stands on its own. |
+| [**Ethgent**](https://github.com/ethosoftai/Ethgent) | The customisable agent: an orchestrator, sub-agents and tools that live in YAML and packs. Tuned for social media today; the same shape can be fitted to other domains. A separate project that stands on its own. |
 | **Marketing Agent Assets** (this repository) | The connection and the open pool: workers, connectors, toolboxes, contracts, guides. |
 | [**MarketingStudio**](https://github.com/Ahmet2001/MarketingStudio) | The factory. Build a workflow once, export it as an agent pack, MCP server, worker and more, and feed it to the agent and the assets. |
 | [**MarketingPool**](https://github.com/Ahmet2001/MarketingPool) | A worked example: the agent and these assets together, running with Docker. |
