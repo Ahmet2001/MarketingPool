@@ -383,9 +383,9 @@ this change invents.
 
 ## Running it standalone
 
-This agent is a full, independently runnable copy of the upstream
-[BrowserAgent](https://github.com/Ahmet2001/BrowserAgent) project (as of the
-commit it was copied at). See its own [README](../agent/README.md) for setup,
+`agent/` is the [Ethgent](https://github.com/ethosoftai/Ethgent) repository
+itself, as a git submodule pinned to one commit, not a copy. See its own
+[README](../agent/README.md) for setup,
 configuration, and terminal usage — nothing about running it changed by
 being placed here.
 
